@@ -2,6 +2,8 @@
 
 macOS menu bar app that periodically pings configured hosts and shows their health as vertical colored bars in the menu bar.
 
+[한국어 README](README.ko.md)
+
 ## Features
 
 - Multiple host configuration from a settings window.
