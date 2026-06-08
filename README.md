@@ -52,6 +52,8 @@ scripts/sign-self-signed.sh --trust-local
 
 The signing script creates `dist/PingStats.zip` and exports `dist/PingStatsSelfSigned.cer`. On another Mac, the certificate is not trusted automatically; use Control-click > Open for first launch, or import the exported certificate into Keychain Access and mark it trusted for code signing.
 
+The GitHub Actions workflow uses ad-hoc signing for CI release packages because self-signed certificate trust changes require interactive keychain authorization on macOS.
+
 If `swift build` fails with an SDK/compiler mismatch, install or select a matching Xcode toolchain:
 
 ```sh

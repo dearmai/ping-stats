@@ -57,6 +57,8 @@ scripts/sign-self-signed.sh --trust-local
 
 다른 Mac에서는 셀프 서명 인증서가 자동으로 신뢰되지 않습니다. 최초 실행 시 Control-click > Open을 사용하거나, `dist/PingStatsSelfSigned.cer`를 키체인 접근 앱에 가져온 뒤 코드서명용으로 신뢰해야 합니다.
 
+GitHub Actions workflow는 CI 릴리즈 패키지에 ad-hoc 서명을 사용합니다. macOS에서 셀프 서명 인증서 trust 변경은 비대화형 러너에서 승인할 수 없는 키체인 권한 작업이기 때문입니다.
+
 ## Xcode 툴체인 검증
 
 `swift build`가 SDK/compiler mismatch 오류로 실패하면 Xcode 또는 Command Line Tools 설정을 확인합니다.
@@ -79,7 +81,7 @@ scripts/verify-xcode-toolchain.sh
 - self-hosted macOS ARM64 러너에서 빌드.
 - SwiftPM manifest 검증.
 - `.app` 번들 생성.
-- 셀프 서명 및 zip 패키지 생성.
+- ad-hoc 서명 및 zip 패키지 생성.
 - artifact 업로드.
 - 태그 빌드인 경우 GitHub Release에 산출물 첨부.
 

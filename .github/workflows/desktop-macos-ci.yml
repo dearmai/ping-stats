@@ -41,12 +41,18 @@ jobs:
 
       - name: Sign and package app
         run: |
-          scripts/sign-self-signed.sh --trust-local
+          codesign \
+            --force \
+            --deep \
+            --strict \
+            --options runtime \
+            --timestamp=none \
+            --sign - \
+            build/PingStats.app
           VERSION="${GITHUB_REF_NAME:-manual}"
           mkdir -p dist/release
-          cp dist/PingStats.zip "dist/release/PingStats_${VERSION}_macos_arm64.zip"
-          cp dist/PingStatsSelfSigned.cer \
-            "dist/release/PingStats_${VERSION}_self_signed_certificate.cer"
+          ditto -c -k --keepParent build/PingStats.app \
+            "dist/release/PingStats_${VERSION}_macos_arm64.zip"
 
       - name: Verify package
         run: |
