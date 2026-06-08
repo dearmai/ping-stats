@@ -1,0 +1,62 @@
+name: Desktop macOS CI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: [self-hosted, macOS, ARM64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Set build info
+        run: |
+          echo "APP_VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          echo "GIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
+      - name: Verify SwiftPM manifest
+        run: swift package dump-package
+
+      - name: Build app bundle
+        run: scripts/build-app.sh
+
+      - name: Sign and package app
+        run: |
+          scripts/sign-self-signed.sh --trust-local
+          VERSION="${GITHUB_REF_NAME:-manual}"
+          mkdir -p dist/release
+          cp dist/PingStats.zip "dist/release/PingStats_${VERSION}_macos_arm64.zip"
+          cp dist/PingStatsSelfSigned.cer \
+            "dist/release/PingStats_${VERSION}_self_signed_certificate.cer"
+
+      - name: Verify package
+        run: |
+          test -d build/PingStats.app
+          test -f dist/release/*.zip
+          codesign --verify --deep --strict --verbose=2 build/PingStats.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-${{ github.sha }}
+          path: dist/release/*
+
+      - name: Release desktop artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release/*

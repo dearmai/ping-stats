@@ -1,0 +1,6 @@
+.build/
+build/
+dist/
+docs/.claudian/
+docs/.obsidian/
+.DS_Store
