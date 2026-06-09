@@ -65,12 +65,25 @@ struct PingTarget: Codable, Equatable, Identifiable {
         return trimmedName.isEmpty ? nil : address
     }
 
+    var probeMode: ProbeMode {
+        address.contains(":") ? .tcping : .ping
+    }
+
     var normalized: PingTarget {
         PingTarget(
             id: id,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             address: address.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+}
+
+enum ProbeMode: String, Codable {
+    case ping
+    case tcping
+
+    var title: String {
+        rawValue.uppercased()
     }
 }
 
@@ -183,6 +196,10 @@ final class HostMonitor: ObservableObject, Identifiable {
 
     var subtitle: String? {
         target.subtitle
+    }
+
+    var probeMode: ProbeMode {
+        target.probeMode
     }
 
     var latestLatencyText: String {

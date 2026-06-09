@@ -79,10 +79,10 @@ struct HostChartRow: View {
             header
 
             PingChart(samples: monitor.samples, health: monitor.health, windowSeconds: windowSeconds)
-                .frame(height: 48)
+                .frame(height: 42)
         }
         .padding(9)
-        .frame(minHeight: 104, maxHeight: 104)
+        .frame(minHeight: 112, maxHeight: 112)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
@@ -98,8 +98,20 @@ struct HostChartRow: View {
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
+
+                Spacer(minLength: 4)
+
+                Text(monitor.probeMode.title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
             .help(monitor.address)
+
+            Text(monitor.address)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(monitor.latestLatencyText)

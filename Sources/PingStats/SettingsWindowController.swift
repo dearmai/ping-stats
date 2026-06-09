@@ -17,7 +17,9 @@ final class SettingsWindowController {
             return
         }
 
-        let view = SettingsView(model: model)
+        let view = SettingsView(model: model) { [weak self] in
+            self?.window?.close()
+        }
         let hostingController = NSHostingController(rootView: view)
         let newWindow = NSWindow(contentViewController: hostingController)
         newWindow.title = "PingStats Settings"
@@ -33,6 +35,7 @@ final class SettingsWindowController {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    let onSave: () -> Void
 
     @State private var targets: [EditableTarget]
     @State private var backgroundInterval: Double
@@ -40,8 +43,9 @@ struct SettingsView: View {
     @State private var foregroundInterval: Double
     @State private var foregroundTimeout: Double
 
-    init(model: AppModel) {
+    init(model: AppModel, onSave: @escaping () -> Void) {
         self.model = model
+        self.onSave = onSave
         let settings = model.settings
         _targets = State(initialValue: settings.targets.map(EditableTarget.init))
         _backgroundInterval = State(initialValue: settings.backgroundInterval)
@@ -146,6 +150,7 @@ struct SettingsView: View {
             foregroundTimeout: foregroundTimeout,
             chartWindowSeconds: model.settings.chartWindowSeconds
         ))
+        onSave()
     }
 }
 
