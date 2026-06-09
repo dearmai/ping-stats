@@ -44,8 +44,41 @@ struct PingSample: Codable, Identifiable, Equatable {
     }
 }
 
+struct PingTarget: Codable, Equatable, Identifiable {
+    var id: UUID
+    var name: String
+    var address: String
+
+    init(id: UUID = UUID(), name: String = "", address: String) {
+        self.id = id
+        self.name = name
+        self.address = address
+    }
+
+    var title: String {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? address : trimmedName
+    }
+
+    var subtitle: String? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? nil : address
+    }
+
+    var normalized: PingTarget {
+        PingTarget(
+            id: id,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            address: address.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    }
+}
+
 struct PingSettings: Codable, Equatable {
-    var hosts: [String] = ["1.1.1.1", "8.8.8.8"]
+    var targets: [PingTarget] = [
+        PingTarget(name: "Cloudflare", address: "1.1.1.1"),
+        PingTarget(name: "Google DNS", address: "8.8.8.8")
+    ]
     var backgroundInterval: TimeInterval = 5
     var backgroundTimeout: TimeInterval = 3
     var foregroundInterval: TimeInterval = 1
@@ -55,13 +88,55 @@ struct PingSettings: Codable, Equatable {
     static let storageKey = "PingStats.settings.v1"
 
     static func load() -> PingSettings {
-        guard
-            let data = UserDefaults.standard.data(forKey: storageKey),
-            let settings = try? JSONDecoder().decode(PingSettings.self, from: data)
-        else {
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
             return PingSettings()
         }
-        return settings.normalized()
+
+        if let settings = try? JSONDecoder().decode(PingSettings.self, from: data) {
+            return settings.normalized()
+        }
+
+        if let legacySettings = try? JSONDecoder().decode(LegacyPingSettings.self, from: data) {
+            return PingSettings(
+                targets: legacySettings.hosts.map { PingTarget(address: $0) },
+                backgroundInterval: legacySettings.backgroundInterval,
+                backgroundTimeout: legacySettings.backgroundTimeout,
+                foregroundInterval: legacySettings.foregroundInterval,
+                foregroundTimeout: legacySettings.foregroundTimeout,
+                chartWindowSeconds: legacySettings.chartWindowSeconds
+            )
+            .normalized()
+        }
+
+        return PingSettings()
+    }
+
+    private struct LegacyPingSettings: Codable {
+        var hosts: [String]
+        var backgroundInterval: TimeInterval
+        var backgroundTimeout: TimeInterval
+        var foregroundInterval: TimeInterval
+        var foregroundTimeout: TimeInterval
+        var chartWindowSeconds: TimeInterval
+    }
+
+    init(
+        targets: [PingTarget] = [
+            PingTarget(name: "Cloudflare", address: "1.1.1.1"),
+            PingTarget(name: "Google DNS", address: "8.8.8.8")
+        ],
+        backgroundInterval: TimeInterval = 5,
+        backgroundTimeout: TimeInterval = 3,
+        foregroundInterval: TimeInterval = 1,
+        foregroundTimeout: TimeInterval = 1,
+        chartWindowSeconds: TimeInterval = 5 * 60
+    ) {
+        self.targets = targets
+        self.backgroundInterval = backgroundInterval
+        self.backgroundTimeout = backgroundTimeout
+        self.foregroundInterval = foregroundInterval
+        self.foregroundTimeout = foregroundTimeout
+        self.chartWindowSeconds = chartWindowSeconds
     }
 
     func save() {
@@ -71,9 +146,9 @@ struct PingSettings: Codable, Equatable {
 
     func normalized() -> PingSettings {
         var copy = self
-        copy.hosts = hosts
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        copy.targets = targets
+            .map(\.normalized)
+            .filter { !$0.address.isEmpty }
         copy.backgroundInterval = max(1, backgroundInterval)
         copy.backgroundTimeout = max(0.2, backgroundTimeout)
         copy.foregroundInterval = max(0.5, foregroundInterval)
@@ -86,16 +161,28 @@ struct PingSettings: Codable, Equatable {
 @MainActor
 final class HostMonitor: ObservableObject, Identifiable {
     let id: UUID
-    let host: String
+    @Published private(set) var target: PingTarget
     @Published private(set) var samples: [PingSample]
     @Published private(set) var health: PingHealth
     @Published var isPinging = false
 
-    init(id: UUID = UUID(), host: String, samples: [PingSample] = []) {
+    init(id: UUID = UUID(), target: PingTarget, samples: [PingSample] = []) {
         self.id = id
-        self.host = host
+        self.target = target
         self.samples = samples
         self.health = Self.evaluate(samples)
+    }
+
+    var title: String {
+        target.title
+    }
+
+    var address: String {
+        target.address
+    }
+
+    var subtitle: String? {
+        target.subtitle
     }
 
     var latestLatencyText: String {
@@ -118,6 +205,10 @@ final class HostMonitor: ObservableObject, Identifiable {
         samples.removeAll { $0.timestamp < cutoff }
         health = Self.evaluate(samples)
         return (old, health)
+    }
+
+    func updateTarget(_ next: PingTarget) {
+        target = next
     }
 
     static func evaluate(_ samples: [PingSample]) -> PingHealth {

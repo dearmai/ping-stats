@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 struct PingResult {
     let latencyMs: Double?
@@ -6,6 +7,17 @@ struct PingResult {
 }
 
 enum PingService {
+    static func probe(address: String, timeout: TimeInterval) async -> PingResult {
+        switch ProbeAddress.parse(address) {
+        case .ping(let host):
+            return await ping(host: host, timeout: timeout)
+        case .tcp(let host, let port):
+            return await tcpPing(host: host, port: port, timeout: timeout)
+        case .invalid(let message):
+            return PingResult(latencyMs: nil, errorMessage: message)
+        }
+    }
+
     static func ping(host: String, timeout: TimeInterval) async -> PingResult {
         let start = Date()
 
@@ -64,6 +76,73 @@ enum PingService {
             character.isNumber || character == "."
         }
         return Double(number)
+    }
+
+    private static func tcpPing(host: String, port: UInt16, timeout: TimeInterval) async -> PingResult {
+        let start = Date()
+
+        return await withCheckedContinuation { continuation in
+            guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+                continuation.resume(returning: PingResult(latencyMs: nil, errorMessage: "Invalid port"))
+                return
+            }
+
+            let continuationBox = PingContinuationBox(continuation)
+            let connection = NWConnection(host: NWEndpoint.Host(host), port: nwPort, using: .tcp)
+            let queue = DispatchQueue(label: "dev.pingstats.tcping.\(host).\(port)")
+
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    let latency = Date().timeIntervalSince(start) * 1000
+                    connection.cancel()
+                    continuationBox.resume(PingResult(latencyMs: latency, errorMessage: nil))
+                case .failed(let error):
+                    connection.cancel()
+                    continuationBox.resume(PingResult(latencyMs: nil, errorMessage: error.localizedDescription))
+                case .waiting(let error):
+                    continuationBox.resume(PingResult(latencyMs: nil, errorMessage: error.localizedDescription))
+                    connection.cancel()
+                default:
+                    break
+                }
+            }
+
+            connection.start(queue: queue)
+
+            Task {
+                try? await Task.sleep(for: .seconds(timeout))
+                connection.cancel()
+                continuationBox.resume(PingResult(latencyMs: nil, errorMessage: "Timeout"))
+            }
+        }
+    }
+}
+
+private enum ProbeAddress {
+    case ping(String)
+    case tcp(String, UInt16)
+    case invalid(String)
+
+    static func parse(_ rawAddress: String) -> ProbeAddress {
+        let address = rawAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !address.isEmpty else {
+            return .invalid("Address is empty")
+        }
+
+        guard let separator = address.lastIndex(of: ":") else {
+            return .ping(address)
+        }
+
+        let host = String(address[..<separator]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let portText = String(address[address.index(after: separator)...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !host.isEmpty, let port = UInt16(portText), port > 0 else {
+            return .invalid("Use host:port with a port from 1 to 65535")
+        }
+
+        return .tcp(host, port)
     }
 }
 

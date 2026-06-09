@@ -94,11 +94,12 @@ struct HostChartRow: View {
                     .fill(Color(nsColor: monitor.health.color))
                     .frame(width: 9, height: 9)
 
-                Text(monitor.host)
+                Text(monitor.title)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .help(monitor.address)
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(monitor.latestLatencyText)

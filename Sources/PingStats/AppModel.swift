@@ -13,7 +13,7 @@ final class AppModel: ObservableObject {
     init() {
         let loadedSettings = PingSettings.load()
         settings = loadedSettings
-        monitors = loadedSettings.hosts.map { HostMonitor(host: $0) }
+        monitors = loadedSettings.targets.map { HostMonitor(target: $0) }
     }
 
     func start() {
@@ -35,7 +35,7 @@ final class AppModel: ObservableObject {
         let normalized = next.normalized()
         settings = normalized
         settings.save()
-        reconcileHosts(normalized.hosts)
+        reconcileTargets(normalized.targets)
         rescheduleTimer()
     }
 
@@ -45,7 +45,7 @@ final class AppModel: ObservableObject {
         for monitor in monitors where !monitor.isPinging {
             monitor.isPinging = true
             Task {
-                let result = await PingService.ping(host: monitor.host, timeout: timeout)
+                let result = await PingService.probe(address: monitor.address, timeout: timeout)
                 await MainActor.run {
                     let sample = PingSample(
                         timestamp: Date(),
@@ -54,16 +54,24 @@ final class AppModel: ObservableObject {
                     )
                     let transition = monitor.record(sample, keeping: settings.chartWindowSeconds)
                     monitor.isPinging = false
-                    notifyIfNeeded(host: monitor.host, old: transition.old, new: transition.new)
+                    notifyIfNeeded(host: monitor.title, old: transition.old, new: transition.new)
                 }
             }
         }
     }
 
-    private func reconcileHosts(_ hosts: [String]) {
-        let existing = Dictionary(uniqueKeysWithValues: monitors.map { ($0.host, $0) })
-        monitors = hosts.map { host in
-            existing[host] ?? HostMonitor(host: host)
+    private func reconcileTargets(_ targets: [PingTarget]) {
+        var existing: [String: HostMonitor] = [:]
+        for monitor in monitors {
+            existing[monitor.address] = monitor
+        }
+
+        monitors = targets.map { target in
+            if let monitor = existing[target.address] {
+                monitor.updateTarget(target)
+                return monitor
+            }
+            return HostMonitor(target: target)
         }
     }
 

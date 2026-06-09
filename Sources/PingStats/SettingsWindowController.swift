@@ -22,7 +22,7 @@ final class SettingsWindowController {
         let newWindow = NSWindow(contentViewController: hostingController)
         newWindow.title = "PingStats Settings"
         newWindow.styleMask = [.titled, .closable, .miniaturizable]
-        newWindow.setContentSize(NSSize(width: 420, height: 380))
+        newWindow.setContentSize(NSSize(width: 560, height: 420))
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
         window = newWindow
@@ -34,7 +34,7 @@ final class SettingsWindowController {
 struct SettingsView: View {
     @ObservedObject var model: AppModel
 
-    @State private var hostsText: String
+    @State private var targets: [EditableTarget]
     @State private var backgroundInterval: Double
     @State private var backgroundTimeout: Double
     @State private var foregroundInterval: Double
@@ -43,7 +43,7 @@ struct SettingsView: View {
     init(model: AppModel) {
         self.model = model
         let settings = model.settings
-        _hostsText = State(initialValue: settings.hosts.joined(separator: "\n"))
+        _targets = State(initialValue: settings.targets.map(EditableTarget.init))
         _backgroundInterval = State(initialValue: settings.backgroundInterval)
         _backgroundTimeout = State(initialValue: settings.backgroundTimeout)
         _foregroundInterval = State(initialValue: settings.foregroundInterval)
@@ -52,16 +52,22 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Hosts")
-                .font(.headline)
+            HStack {
+                Text("Targets")
+                    .font(.headline)
 
-            TextEditor(text: $hostsText)
-                .font(.system(.body, design: .monospaced))
-                .frame(height: 128)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor))
+                Spacer()
+
+                Button {
+                    targets.append(EditableTarget(name: "", address: ""))
+                } label: {
+                    Image(systemName: "plus")
                 }
+                .buttonStyle(.borderless)
+                .help("Add target")
+            }
+
+            targetEditor
 
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
@@ -88,23 +94,76 @@ struct SettingsView: View {
             }
         }
         .padding(18)
-        .frame(width: 420, height: 380)
+        .frame(width: 560, height: 420)
+    }
+
+    private var targetEditor: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Name")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 150, alignment: .leading)
+                Text("Address")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                    .frame(width: 24)
+            }
+
+            ForEach($targets) { $target in
+                HStack(spacing: 8) {
+                    TextField("Name", text: $target.name)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 150)
+
+                    TextField("IP or IP:port", text: $target.address)
+                        .textFieldStyle(.roundedBorder)
+
+                    Button {
+                        targets.removeAll { $0.id == target.id }
+                    } label: {
+                        Image(systemName: "minus.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Remove target")
+                }
+            }
+        }
+        .frame(height: 150, alignment: .top)
     }
 
     private func save() {
-        let hosts = hostsText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        let savedTargets = targets
+            .map { PingTarget(id: $0.id, name: $0.name, address: $0.address).normalized }
+            .filter { !$0.address.isEmpty }
 
         model.updateSettings(PingSettings(
-            hosts: hosts,
+            targets: savedTargets,
             backgroundInterval: backgroundInterval,
             backgroundTimeout: backgroundTimeout,
             foregroundInterval: foregroundInterval,
             foregroundTimeout: foregroundTimeout,
             chartWindowSeconds: model.settings.chartWindowSeconds
         ))
+    }
+}
+
+private struct EditableTarget: Identifiable {
+    var id: UUID
+    var name: String
+    var address: String
+
+    init(id: UUID = UUID(), name: String, address: String) {
+        self.id = id
+        self.name = name
+        self.address = address
+    }
+
+    init(_ target: PingTarget) {
+        id = target.id
+        name = target.name
+        address = target.address
     }
 }
 

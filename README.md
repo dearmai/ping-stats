@@ -6,7 +6,10 @@ macOS menu bar app that periodically pings configured hosts and shows their heal
 
 ## Features
 
-- Multiple host configuration from a settings window.
+- Multiple named target configuration from a settings window.
+- Address mode:
+  - `IP` runs normal ping.
+  - `IP:port` runs TCP connect latency checks.
 - Background ping loop, default interval 5 seconds and timeout 3 seconds.
 - Foreground ping loop while the popover is open, default interval 1 second and timeout 1 second.
 - Menu bar color per host:
