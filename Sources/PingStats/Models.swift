@@ -48,11 +48,28 @@ struct PingTarget: Codable, Equatable, Identifiable {
     var id: UUID
     var name: String
     var address: String
+    var isEnabled: Bool
 
-    init(id: UUID = UUID(), name: String = "", address: String) {
+    init(id: UUID = UUID(), name: String = "", address: String, isEnabled: Bool = true) {
         self.id = id
         self.name = name
         self.address = address
+        self.isEnabled = isEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case address
+        case isEnabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        address = try container.decode(String.self, forKey: .address)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
     }
 
     var title: String {
@@ -66,14 +83,19 @@ struct PingTarget: Codable, Equatable, Identifiable {
     }
 
     var probeMode: ProbeMode {
-        address.contains(":") ? .tcping : .ping
+        let lowercasedAddress = address.lowercased()
+        if lowercasedAddress.hasPrefix("http://") || lowercasedAddress.hasPrefix("https://") {
+            return .http
+        }
+        return address.contains(":") ? .tcping : .ping
     }
 
     var normalized: PingTarget {
         PingTarget(
             id: id,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            address: address.trimmingCharacters(in: .whitespacesAndNewlines)
+            address: address.trimmingCharacters(in: .whitespacesAndNewlines),
+            isEnabled: isEnabled
         )
     }
 }
@@ -81,6 +103,7 @@ struct PingTarget: Codable, Equatable, Identifiable {
 enum ProbeMode: String, Codable {
     case ping
     case tcping
+    case http
 
     var title: String {
         rawValue.uppercased()
@@ -96,7 +119,7 @@ struct PingSettings: Codable, Equatable {
     var backgroundTimeout: TimeInterval = 3
     var foregroundInterval: TimeInterval = 1
     var foregroundTimeout: TimeInterval = 1
-    var chartWindowSeconds: TimeInterval = 5 * 60
+    var chartWindowSeconds: TimeInterval = 10 * 60
 
     static let storageKey = "PingStats.settings.v1"
 
@@ -142,7 +165,7 @@ struct PingSettings: Codable, Equatable {
         backgroundTimeout: TimeInterval = 3,
         foregroundInterval: TimeInterval = 1,
         foregroundTimeout: TimeInterval = 1,
-        chartWindowSeconds: TimeInterval = 5 * 60
+        chartWindowSeconds: TimeInterval = 10 * 60
     ) {
         self.targets = targets
         self.backgroundInterval = backgroundInterval
@@ -166,7 +189,7 @@ struct PingSettings: Codable, Equatable {
         copy.backgroundTimeout = max(0.2, backgroundTimeout)
         copy.foregroundInterval = max(0.5, foregroundInterval)
         copy.foregroundTimeout = max(0.2, foregroundTimeout)
-        copy.chartWindowSeconds = max(60, chartWindowSeconds)
+        copy.chartWindowSeconds = min(max(60, chartWindowSeconds), 60 * 60)
         return copy
     }
 }

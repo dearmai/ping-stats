@@ -9,12 +9,36 @@ struct PingResult {
 enum PingService {
     static func probe(address: String, timeout: TimeInterval) async -> PingResult {
         switch ProbeAddress.parse(address) {
+        case .http(let url):
+            return await httpStatus(url: url, timeout: timeout)
         case .ping(let host):
             return await ping(host: host, timeout: timeout)
         case .tcp(let host, let port):
             return await tcpPing(host: host, port: port, timeout: timeout)
         case .invalid(let message):
             return PingResult(latencyMs: nil, errorMessage: message)
+        }
+    }
+
+    private static func httpStatus(url: URL, timeout: TimeInterval) async -> PingResult {
+        let start = Date()
+        var request = URLRequest(url: url)
+        request.timeoutInterval = timeout
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return PingResult(latencyMs: nil, errorMessage: "Invalid HTTP response")
+            }
+
+            guard 200..<400 ~= httpResponse.statusCode else {
+                return PingResult(latencyMs: nil, errorMessage: "HTTP \(httpResponse.statusCode)")
+            }
+
+            let latency = Date().timeIntervalSince(start) * 1000
+            return PingResult(latencyMs: latency, errorMessage: nil)
+        } catch {
+            return PingResult(latencyMs: nil, errorMessage: error.localizedDescription)
         }
     }
 
@@ -120,6 +144,7 @@ enum PingService {
 }
 
 private enum ProbeAddress {
+    case http(URL)
     case ping(String)
     case tcp(String, UInt16)
     case invalid(String)
@@ -128,6 +153,13 @@ private enum ProbeAddress {
         let address = rawAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !address.isEmpty else {
             return .invalid("Address is empty")
+        }
+
+        if let url = URL(string: address),
+           let scheme = url.scheme?.lowercased(),
+           (scheme == "http" || scheme == "https"),
+           url.host() != nil {
+            return .http(url)
         }
 
         guard let separator = address.lastIndex(of: ":") else {

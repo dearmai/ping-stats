@@ -13,7 +13,9 @@ final class AppModel: ObservableObject {
     init() {
         let loadedSettings = PingSettings.load()
         settings = loadedSettings
-        monitors = loadedSettings.targets.map { HostMonitor(target: $0) }
+        monitors = loadedSettings.targets
+            .filter(\.isEnabled)
+            .map { HostMonitor(target: $0) }
     }
 
     func start() {
@@ -35,7 +37,7 @@ final class AppModel: ObservableObject {
         let normalized = next.normalized()
         settings = normalized
         settings.save()
-        reconcileTargets(normalized.targets)
+        reconcileTargets(normalized.targets.filter(\.isEnabled))
         rescheduleTimer()
     }
 

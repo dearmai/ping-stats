@@ -30,12 +30,13 @@ final class StatusBarController: NSObject {
         .environmentObject(model)
 
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 560, height: 420)
+        popover.contentSize = MonitorView.contentSize(for: model.monitors.count)
         popover.contentViewController = NSHostingController(rootView: content)
         popover.delegate = self
 
         model.$monitors.sink { [weak self] monitors in
             self?.observe(monitors)
+            self?.popover.contentSize = MonitorView.contentSize(for: monitors.count)
             self?.refreshStatusItem()
         }
         .store(in: &modelCancellables)

@@ -5,6 +5,15 @@ struct MonitorView: View {
     let onOpenSettings: () -> Void
     let onQuit: () -> Void
 
+    static let width: CGFloat = 560
+    static let minHeight: CGFloat = 220
+    static let maxHeight: CGFloat = 640
+
+    private static let headerHeight: CGFloat = 44
+    private static let gridPadding: CGFloat = 28
+    private static let gridSpacing: CGFloat = 10
+    private static let cardHeight: CGFloat = 112
+
     private static let clockFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
@@ -19,23 +28,39 @@ struct MonitorView: View {
                 ContentUnavailableView("No Hosts", systemImage: "network.slash")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
-                    alignment: .leading,
-                    spacing: 10
-                ) {
-                    ForEach(model.monitors) { monitor in
-                        HostChartRow(monitor: monitor, windowSeconds: model.settings.chartWindowSeconds)
+                ScrollView {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: Self.gridSpacing),
+                            GridItem(.flexible(), spacing: Self.gridSpacing)
+                        ],
+                        alignment: .leading,
+                        spacing: Self.gridSpacing
+                    ) {
+                        ForEach(model.monitors) { monitor in
+                            HostChartRow(monitor: monitor, windowSeconds: model.settings.chartWindowSeconds)
+                        }
                     }
+                    .padding(14)
                 }
-                .padding(14)
+                .scrollIndicators(.visible)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
-        .frame(width: 560, height: 420)
+        .frame(width: Self.width, height: Self.contentHeight(for: model.monitors.count))
+    }
+
+    static func contentSize(for monitorCount: Int) -> NSSize {
+        NSSize(width: width, height: contentHeight(for: monitorCount))
+    }
+
+    private static func contentHeight(for monitorCount: Int) -> CGFloat {
+        guard monitorCount > 0 else { return minHeight }
+
+        let rowCount = CGFloat((monitorCount + 1) / 2)
+        let spacing = max(0, rowCount - 1) * gridSpacing
+        let contentHeight = headerHeight + gridPadding + (rowCount * cardHeight) + spacing
+        return min(max(contentHeight, minHeight), maxHeight)
     }
 
     private var header: some View {

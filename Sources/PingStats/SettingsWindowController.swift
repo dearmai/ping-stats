@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 final class SettingsWindowController {
@@ -42,6 +43,8 @@ struct SettingsView: View {
     @State private var backgroundTimeout: Double
     @State private var foregroundInterval: Double
     @State private var foregroundTimeout: Double
+    @State private var chartWindowMinutes: Double
+    @State private var draggingTargetID: UUID?
 
     init(model: AppModel, onSave: @escaping () -> Void) {
         self.model = model
@@ -52,6 +55,7 @@ struct SettingsView: View {
         _backgroundTimeout = State(initialValue: settings.backgroundTimeout)
         _foregroundInterval = State(initialValue: settings.foregroundInterval)
         _foregroundTimeout = State(initialValue: settings.foregroundTimeout)
+        _chartWindowMinutes = State(initialValue: settings.chartWindowSeconds / 60)
     }
 
     var body: some View {
@@ -85,6 +89,13 @@ struct SettingsView: View {
                     NumberField(title: "Interval", value: $foregroundInterval, suffix: "sec")
                     NumberField(title: "Timeout", value: $foregroundTimeout, suffix: "sec")
                 }
+
+                GridRow {
+                    Text("Chart")
+                    NumberField(title: "Window", value: $chartWindowMinutes, suffix: "min")
+                    Text("1-60 min")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -104,6 +115,12 @@ struct SettingsView: View {
     private var targetEditor: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
+                Color.clear
+                    .frame(width: 16)
+                Text("Use")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, alignment: .leading)
                 Text("Name")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -115,31 +132,62 @@ struct SettingsView: View {
                     .frame(width: 24)
             }
 
-            ForEach($targets) { $target in
-                HStack(spacing: 8) {
-                    TextField("Name", text: $target.name)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 150)
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach($targets) { $target in
+                        HStack(spacing: 8) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .frame(width: 16)
+                                .contentShape(Rectangle())
+                                .onDrag {
+                                    draggingTargetID = target.id
+                                    return NSItemProvider(object: target.id.uuidString as NSString)
+                                }
+                                .help("Drag to reorder")
 
-                    TextField("IP or IP:port", text: $target.address)
-                        .textFieldStyle(.roundedBorder)
+                            Toggle("", isOn: $target.isEnabled)
+                                .toggleStyle(.checkbox)
+                                .labelsHidden()
+                                .frame(width: 34, alignment: .leading)
+                                .help("Enable target")
 
-                    Button {
-                        targets.removeAll { $0.id == target.id }
-                    } label: {
-                        Image(systemName: "minus.circle")
+                            TextField("Name", text: $target.name)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 150)
+
+                            TextField("IP, IP:port, or URL", text: $target.address)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        .onDrop(
+                            of: [UTType.text],
+                            delegate: TargetDropDelegate(
+                                targetID: target.id,
+                                targets: $targets,
+                                draggingTargetID: $draggingTargetID
+                            )
+                        )
                     }
-                    .buttonStyle(.borderless)
-                    .help("Remove target")
                 }
+                .padding(.trailing, 4)
             }
+            .scrollIndicators(.visible)
+            .frame(height: 150)
         }
-        .frame(height: 150, alignment: .top)
     }
 
     private func save() {
         let savedTargets = targets
-            .map { PingTarget(id: $0.id, name: $0.name, address: $0.address).normalized }
+            .map {
+                PingTarget(
+                    id: $0.id,
+                    name: $0.name,
+                    address: $0.address,
+                    isEnabled: $0.isEnabled
+                )
+                .normalized
+            }
             .filter { !$0.address.isEmpty }
 
         model.updateSettings(PingSettings(
@@ -148,7 +196,7 @@ struct SettingsView: View {
             backgroundTimeout: backgroundTimeout,
             foregroundInterval: foregroundInterval,
             foregroundTimeout: foregroundTimeout,
-            chartWindowSeconds: model.settings.chartWindowSeconds
+            chartWindowSeconds: chartWindowMinutes * 60
         ))
         onSave()
     }
@@ -158,17 +206,53 @@ private struct EditableTarget: Identifiable {
     var id: UUID
     var name: String
     var address: String
+    var isEnabled: Bool
 
-    init(id: UUID = UUID(), name: String, address: String) {
+    init(id: UUID = UUID(), name: String, address: String, isEnabled: Bool = true) {
         self.id = id
         self.name = name
         self.address = address
+        self.isEnabled = isEnabled
     }
 
     init(_ target: PingTarget) {
         id = target.id
         name = target.name
         address = target.address
+        isEnabled = target.isEnabled
+    }
+}
+
+private struct TargetDropDelegate: DropDelegate {
+    let targetID: UUID
+    @Binding var targets: [EditableTarget]
+    @Binding var draggingTargetID: UUID?
+
+    func dropEntered(info: DropInfo) {
+        guard
+            let draggingTargetID,
+            draggingTargetID != targetID,
+            let sourceIndex = targets.firstIndex(where: { $0.id == draggingTargetID }),
+            let destinationIndex = targets.firstIndex(where: { $0.id == targetID })
+        else {
+            return
+        }
+
+        withAnimation(.default) {
+            targets.move(
+                fromOffsets: IndexSet(integer: sourceIndex),
+                toOffset: destinationIndex > sourceIndex ? destinationIndex + 1 : destinationIndex
+            )
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingTargetID = nil
+        return true
     }
 }
 
