@@ -89,12 +89,19 @@ final class AppModel: ObservableObject {
     }
 
     private func notifyIfNeeded(host: String, old: PingHealth, new: PingHealth) {
-        let shouldNotify = (old.isNormal && !new.isNormal) || (!old.isNormal && !new.isNormal && old != new)
+        // Alert on any band change except:
+        //  - transitions to/from .unknown (warm-up / no data yet)
+        //  - green <-> blue flapping (both normal, low signal)
+        let shouldNotify = old != new
+            && old != .unknown
+            && new != .unknown
+            && !(old.isNormal && new.isNormal)
         guard shouldNotify else { return }
 
+        let recovered = !old.isNormal && new.isNormal
         let content = UNMutableNotificationContent()
-        content.title = "PingStats: \(host)"
-        content.body = "\(old.title) -> \(new.title)"
+        content.title = recovered ? "PingStats: \(host) recovered" : "PingStats: \(host)"
+        content.body = "\(old.title) → \(new.title)"
         content.sound = .default
 
         let request = UNNotificationRequest(

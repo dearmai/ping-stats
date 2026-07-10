@@ -15,13 +15,14 @@ macOS menu bar app that periodically pings configured hosts and shows their heal
 - Menu bar color per host:
   - Green: recent 10-sample average under 50 ms.
   - Blue: recent 10-sample average under 100 ms.
-  - Yellow: recent 10-sample average under 200 ms, over 200 ms, or not enough 10-sample data.
+  - Yellow: recent 10-sample average of 100 ms or more.
   - Orange: at least one timeout or network error in the recent 10 samples.
   - Red: at least 4 errors in the recent 5 samples.
+  - Gray: warming up, fewer than 10 samples and no errors yet.
 - User notification rules:
-  - Normal states, green or blue, to warning/error states.
-  - Any transition among yellow, orange, and red.
-  - No notification for green to blue or blue to green.
+  - Any health-band change: normal (green/blue) to a warning/error state, and recovery back to normal.
+  - Any severity change among yellow, orange, and red.
+  - No notification for green to blue or blue to green, or for transitions in/out of the warming-up gray state.
 - Popover chart with current `HH:mm:ss` time and recent 5-minute response history.
 
 ## Build

@@ -7,6 +7,7 @@ enum PingHealth: Int, Codable, CaseIterable {
     case yellow
     case orange
     case red
+    case unknown
 
     var isNormal: Bool {
         self == .green || self == .blue
@@ -19,6 +20,7 @@ enum PingHealth: Int, Codable, CaseIterable {
         case .yellow: "Warning"
         case .orange: "Error"
         case .red: "Critical"
+        case .unknown: "Unknown"
         }
     }
 
@@ -29,6 +31,7 @@ enum PingHealth: Int, Codable, CaseIterable {
         case .yellow: NSColor.systemYellow
         case .orange: NSColor.systemOrange
         case .red: NSColor.systemRed
+        case .unknown: NSColor.systemGray
         }
     }
 }
@@ -263,7 +266,7 @@ final class HostMonitor: ObservableObject, Identifiable {
         }
 
         guard last10.count >= 10 else {
-            return .yellow
+            return .unknown
         }
 
         let latencies = last10.compactMap(\.latencyMs)
