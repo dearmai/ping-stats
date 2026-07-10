@@ -9,7 +9,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error {
+                NSLog("PingStats notification authorization failed: \(error.localizedDescription)")
+            } else {
+                NSLog("PingStats notification authorization granted: \(granted)")
+            }
+        }
 
         statusController = StatusBarController(model: model)
         settingsController = SettingsWindowController(model: model)

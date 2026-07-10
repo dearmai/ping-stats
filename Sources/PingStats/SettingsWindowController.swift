@@ -44,6 +44,7 @@ struct SettingsView: View {
     @State private var foregroundInterval: Double
     @State private var foregroundTimeout: Double
     @State private var chartWindowMinutes: Double
+    @State private var blueLatencyMs: Double
     @State private var draggingTargetID: UUID?
 
     init(model: AppModel, onSave: @escaping () -> Void) {
@@ -56,6 +57,7 @@ struct SettingsView: View {
         _foregroundInterval = State(initialValue: settings.foregroundInterval)
         _foregroundTimeout = State(initialValue: settings.foregroundTimeout)
         _chartWindowMinutes = State(initialValue: settings.chartWindowSeconds / 60)
+        _blueLatencyMs = State(initialValue: settings.blueLatencyMs)
     }
 
     var body: some View {
@@ -94,6 +96,13 @@ struct SettingsView: View {
                     Text("Chart")
                     NumberField(title: "Window", value: $chartWindowMinutes, suffix: "min")
                     Text("1-60 min")
+                        .foregroundStyle(.secondary)
+                }
+
+                GridRow {
+                    Text("Health")
+                    NumberField(title: "Blue \u{2264}", value: $blueLatencyMs, suffix: "ms")
+                    Text("green < 50 ms, yellow above")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -196,7 +205,8 @@ struct SettingsView: View {
             backgroundTimeout: backgroundTimeout,
             foregroundInterval: foregroundInterval,
             foregroundTimeout: foregroundTimeout,
-            chartWindowSeconds: chartWindowMinutes * 60
+            chartWindowSeconds: chartWindowMinutes * 60,
+            blueLatencyMs: blueLatencyMs
         ))
         onSave()
     }

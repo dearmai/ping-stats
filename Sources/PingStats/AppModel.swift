@@ -54,7 +54,11 @@ final class AppModel: ObservableObject {
                         latencyMs: result.latencyMs,
                         errorMessage: result.errorMessage
                     )
-                    let transition = monitor.record(sample, keeping: settings.chartWindowSeconds)
+                    let transition = monitor.record(
+                        sample,
+                        keeping: settings.chartWindowSeconds,
+                        blueThresholdMs: settings.blueLatencyMs
+                    )
                     monitor.isPinging = false
                     notifyIfNeeded(host: monitor.title, old: transition.old, new: transition.new)
                 }
@@ -90,15 +94,18 @@ final class AppModel: ObservableObject {
 
     private func notifyIfNeeded(host: String, old: PingHealth, new: PingHealth) {
         // Alert on any band change except:
-        //  - transitions to/from .unknown (warm-up / no data yet)
+        //  - moving INTO .unknown (samples aged out / warming up again)
         //  - green <-> blue flapping (both normal, low signal)
+        //  - .unknown -> abnormal (a target already down at launch stays quiet;
+        //    only its later recovery is reported)
+        // Warm-up settling into normal (.unknown -> green/blue) DOES notify.
         let shouldNotify = old != new
-            && old != .unknown
             && new != .unknown
+            && (old != .unknown || new.isNormal)
             && !(old.isNormal && new.isNormal)
         guard shouldNotify else { return }
 
-        let recovered = !old.isNormal && new.isNormal
+        let recovered = old != .unknown && !old.isNormal && new.isNormal
         let content = UNMutableNotificationContent()
         content.title = recovered ? "PingStats: \(host) recovered" : "PingStats: \(host)"
         content.body = "\(old.title) → \(new.title)"

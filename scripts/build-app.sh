@@ -20,6 +20,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <dict>
     <key>CFBundleExecutable</key>
     <string>PingStats</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>dev.pingstats.app</string>
     <key>CFBundleName</key>
@@ -39,5 +41,19 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+RESOURCES_DIR="$CONTENTS_DIR/Resources"
+ICON_SRC="$ROOT_DIR/Resources/AppIcon.icns"
+if [[ ! -f "$ICON_SRC" ]]; then
+    scripts/generate-icon.sh >/dev/null
+fi
+mkdir -p "$RESOURCES_DIR"
+cp "$ICON_SRC" "$RESOURCES_DIR/AppIcon.icns"
+
+# The Swift linker only applies a linker-signed ad-hoc signature that leaves the
+# Info.plist unbound, so macOS cannot resolve the bundle identity and silently
+# denies UserNotifications. A real codesign pass seals resources and binds the
+# Info.plist, which is the minimum required for local notifications to work.
+codesign --force --sign - "$APP_DIR"
 
 echo "$APP_DIR"

@@ -54,13 +54,17 @@ All source under `Sources/PingStats/`:
 
 **Health evaluation** (`HostMonitor.evaluate`, recent samples): red = ≥4 errors in last 5;
 orange = any error in last 10; `.unknown` = fewer than 10 samples and no errors (warm-up,
-shown gray); otherwise by 10-sample average latency — green < 50 ms, blue < 100 ms, else
-yellow. `isNormal` == green or blue.
+shown gray); otherwise by 10-sample average latency — green < 50 ms, blue < the configurable
+blue threshold (`PingSettings.blueLatencyMs`, default 60 ms, edited in settings), else
+yellow. `isNormal` == green or blue. The threshold is threaded through `record` →
+`evaluate`; a `min(50, blue)` guard keeps green ≤ blue if blue is set very low.
 
 **Notifications** (`AppModel.notifyIfNeeded`): fire on a health-band change, i.e.
 normal↔abnormal crossings (including **recovery**) and severity changes among
-yellow/orange/red. Suppressed: any transition touching `.unknown` (warm-up noise) and
-green↔blue flapping (both normal). Recovery notifications set a distinct title.
+yellow/orange/red. Warm-up settling into normal (`.unknown` → green/blue) also fires.
+Suppressed: moving *into* `.unknown`, `.unknown` → abnormal (a target already down at
+launch stays quiet until it recovers), and green↔blue flapping. Recovery from a real
+problem (abnormal, non-`.unknown` → normal) sets a distinct "recovered" title.
 
 **Address modes** (`PingTarget.probeMode` / `ProbeAddress.parse`): `http(s)://` → HTTP
 status check (2xx/3xx ok); `host:port` → TCP connect latency; otherwise → ICMP ping.
