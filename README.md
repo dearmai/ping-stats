@@ -13,8 +13,8 @@ macOS menu bar app that periodically pings configured hosts and shows their heal
 - Background ping loop, default interval 5 seconds and timeout 3 seconds.
 - Foreground ping loop while the popover is open, default interval 1 second and timeout 1 second.
 - Menu bar color per host:
-  - Green: recent 10-sample average under 50 ms.
-  - Blue: recent 10-sample average under the configurable blue threshold (default 60 ms), editable in settings.
+  - Green: recent 10-sample average under the configurable green threshold (default 60 ms), editable in settings.
+  - Blue: recent 10-sample average under the configurable blue threshold (default 120 ms), editable in settings.
   - Yellow: recent 10-sample average at or above the blue threshold.
   - Orange: at least one timeout or network error in the recent 10 samples.
   - Red: at least 4 errors in the recent 5 samples.

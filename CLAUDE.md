@@ -54,10 +54,11 @@ All source under `Sources/PingStats/`:
 
 **Health evaluation** (`HostMonitor.evaluate`, recent samples): red = ≥4 errors in last 5;
 orange = any error in last 10; `.unknown` = fewer than 10 samples and no errors (warm-up,
-shown gray); otherwise by 10-sample average latency — green < 50 ms, blue < the configurable
-blue threshold (`PingSettings.blueLatencyMs`, default 60 ms, edited in settings), else
-yellow. `isNormal` == green or blue. The threshold is threaded through `record` →
-`evaluate`; a `min(50, blue)` guard keeps green ≤ blue if blue is set very low.
+shown gray); otherwise by 10-sample average latency — green < the green threshold
+(`PingSettings.greenLatencyMs`, default 60 ms), blue < the blue threshold
+(`PingSettings.blueLatencyMs`, default 120 ms), else yellow; both are edited in settings.
+`isNormal` == green or blue. Thresholds are threaded through `record` → `evaluate`;
+a `max(green, blue)` guard keeps blue ≥ green if blue is set below green.
 
 **Notifications** (`AppModel.notifyIfNeeded`): fire on a health-band change, i.e.
 normal↔abnormal crossings (including **recovery**) and severity changes among

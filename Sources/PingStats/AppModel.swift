@@ -57,6 +57,7 @@ final class AppModel: ObservableObject {
                     let transition = monitor.record(
                         sample,
                         keeping: settings.chartWindowSeconds,
+                        greenThresholdMs: settings.greenLatencyMs,
                         blueThresholdMs: settings.blueLatencyMs
                     )
                     monitor.isPinging = false

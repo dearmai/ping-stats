@@ -123,7 +123,8 @@ struct PingSettings: Codable, Equatable {
     var foregroundInterval: TimeInterval = 1
     var foregroundTimeout: TimeInterval = 1
     var chartWindowSeconds: TimeInterval = 10 * 60
-    var blueLatencyMs: Double = 60
+    var greenLatencyMs: Double = 60
+    var blueLatencyMs: Double = 120
 
     private enum CodingKeys: String, CodingKey {
         case targets
@@ -132,6 +133,7 @@ struct PingSettings: Codable, Equatable {
         case foregroundInterval
         case foregroundTimeout
         case chartWindowSeconds
+        case greenLatencyMs
         case blueLatencyMs
     }
 
@@ -143,8 +145,9 @@ struct PingSettings: Codable, Equatable {
         foregroundInterval = try container.decode(TimeInterval.self, forKey: .foregroundInterval)
         foregroundTimeout = try container.decode(TimeInterval.self, forKey: .foregroundTimeout)
         chartWindowSeconds = try container.decode(TimeInterval.self, forKey: .chartWindowSeconds)
-        // Added after v1 shipped; older saved settings lack this key.
-        blueLatencyMs = try container.decodeIfPresent(Double.self, forKey: .blueLatencyMs) ?? 60
+        // Added after v1 shipped; older saved settings lack these keys.
+        greenLatencyMs = try container.decodeIfPresent(Double.self, forKey: .greenLatencyMs) ?? 60
+        blueLatencyMs = try container.decodeIfPresent(Double.self, forKey: .blueLatencyMs) ?? 120
     }
 
     static let storageKey = "PingStats.settings.v1"
@@ -166,7 +169,8 @@ struct PingSettings: Codable, Equatable {
                 foregroundInterval: legacySettings.foregroundInterval,
                 foregroundTimeout: legacySettings.foregroundTimeout,
                 chartWindowSeconds: legacySettings.chartWindowSeconds,
-                blueLatencyMs: 60
+                greenLatencyMs: 60,
+                blueLatencyMs: 120
             )
             .normalized()
         }
@@ -193,7 +197,8 @@ struct PingSettings: Codable, Equatable {
         foregroundInterval: TimeInterval = 1,
         foregroundTimeout: TimeInterval = 1,
         chartWindowSeconds: TimeInterval = 10 * 60,
-        blueLatencyMs: Double = 60
+        greenLatencyMs: Double = 60,
+        blueLatencyMs: Double = 120
     ) {
         self.targets = targets
         self.backgroundInterval = backgroundInterval
@@ -201,6 +206,7 @@ struct PingSettings: Codable, Equatable {
         self.foregroundInterval = foregroundInterval
         self.foregroundTimeout = foregroundTimeout
         self.chartWindowSeconds = chartWindowSeconds
+        self.greenLatencyMs = greenLatencyMs
         self.blueLatencyMs = blueLatencyMs
     }
 
@@ -219,6 +225,7 @@ struct PingSettings: Codable, Equatable {
         copy.foregroundInterval = max(0.5, foregroundInterval)
         copy.foregroundTimeout = max(0.2, foregroundTimeout)
         copy.chartWindowSeconds = min(max(60, chartWindowSeconds), 60 * 60)
+        copy.greenLatencyMs = min(max(1, greenLatencyMs), 100_000)
         copy.blueLatencyMs = min(max(1, blueLatencyMs), 100_000)
         return copy
     }
@@ -271,13 +278,18 @@ final class HostMonitor: ObservableObject, Identifiable {
     func record(
         _ sample: PingSample,
         keeping seconds: TimeInterval,
+        greenThresholdMs: Double,
         blueThresholdMs: Double
     ) -> (old: PingHealth, new: PingHealth) {
         let old = health
         samples.append(sample)
         let cutoff = Date().addingTimeInterval(-seconds)
         samples.removeAll { $0.timestamp < cutoff }
-        health = Self.evaluate(samples, blueThresholdMs: blueThresholdMs)
+        health = Self.evaluate(
+            samples,
+            greenThresholdMs: greenThresholdMs,
+            blueThresholdMs: blueThresholdMs
+        )
         return (old, health)
     }
 
@@ -285,7 +297,11 @@ final class HostMonitor: ObservableObject, Identifiable {
         target = next
     }
 
-    static func evaluate(_ samples: [PingSample], blueThresholdMs: Double = 60) -> PingHealth {
+    static func evaluate(
+        _ samples: [PingSample],
+        greenThresholdMs: Double = 60,
+        blueThresholdMs: Double = 120
+    ) -> PingHealth {
         let last5 = Array(samples.suffix(5))
         if last5.filter(\.isError).count >= 4 {
             return .red
@@ -306,12 +322,12 @@ final class HostMonitor: ObservableObject, Identifiable {
         }
 
         let average = latencies.reduce(0, +) / Double(latencies.count)
-        // Green stays the "good" tier below the configurable blue ceiling; the min
-        // guard keeps the two bands ordered if blue is set below 50 ms.
-        if average < min(50, blueThresholdMs) {
+        // Both ceilings are configurable; the max guard keeps blue >= green so the
+        // bands stay ordered even if blue is set below green.
+        if average < greenThresholdMs {
             return .green
         }
-        if average < blueThresholdMs {
+        if average < max(greenThresholdMs, blueThresholdMs) {
             return .blue
         }
         return .yellow
