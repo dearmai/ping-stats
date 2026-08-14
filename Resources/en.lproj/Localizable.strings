@@ -1,0 +1,3 @@
+/* English is the key language, so every lookup falls back to the key itself.
+   This file exists so the bundle advertises an English localization and an
+   English system does not fall through to ko.lproj. */

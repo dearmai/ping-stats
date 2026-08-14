@@ -7,6 +7,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var monitors: [HostMonitor]
     @Published private(set) var currentTime = Date()
     @Published private(set) var isForeground = false
+    @Published private(set) var localAddresses: [LocalAddress] = []
 
     private var timer: Timer?
 
@@ -19,6 +20,7 @@ final class AppModel: ObservableObject {
     }
 
     func start() {
+        refreshLocalAddresses()
         rescheduleTimer()
     }
 
@@ -43,6 +45,7 @@ final class AppModel: ObservableObject {
 
     func pingNow() {
         currentTime = Date()
+        refreshLocalAddresses()
         let timeout = isForeground ? settings.foregroundTimeout : settings.backgroundTimeout
         for monitor in monitors where !monitor.isPinging {
             monitor.isPinging = true
@@ -65,6 +68,14 @@ final class AppModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Cheap enough to run on every tick; the equality guard keeps the popover
+    /// from redrawing while the NIC list is unchanged.
+    private func refreshLocalAddresses() {
+        let next = LocalAddressProvider.current()
+        guard next != localAddresses else { return }
+        localAddresses = next
     }
 
     private func reconcileTargets(_ targets: [PingTarget]) {
@@ -117,8 +128,11 @@ final class AppModel: ObservableObject {
         let host = target.title
         let recovered = old != .unknown && !old.isNormal && new.isNormal
         let content = UNMutableNotificationContent()
-        content.title = recovered ? "PingStats: \(host) recovered" : "PingStats: \(host)"
-        content.body = "\(old.title) → \(new.title)"
+        content.title = String(
+            format: recovered ? L10n.string("PingStats: %@ recovered") : L10n.string("PingStats: %@"),
+            host
+        )
+        content.body = String(format: L10n.string("%@ → %@"), old.title, new.title)
         content.sound = .default
 
         let request = UNNotificationRequest(

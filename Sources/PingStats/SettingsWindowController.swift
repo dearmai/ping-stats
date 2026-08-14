@@ -23,7 +23,7 @@ final class SettingsWindowController {
         }
         let hostingController = NSHostingController(rootView: view)
         let newWindow = NSWindow(contentViewController: hostingController)
-        newWindow.title = "PingStats Settings"
+        newWindow.title = L10n.string("PingStats Settings")
         newWindow.styleMask = [.titled, .closable, .miniaturizable]
         newWindow.setContentSize(NSSize(width: 660, height: 440))
         newWindow.center()
@@ -46,6 +46,8 @@ struct SettingsView: View {
     @State private var chartWindowMinutes: Double
     @State private var greenLatencyMs: Double
     @State private var blueLatencyMs: Double
+    @State private var launchAtLogin: Bool
+    @State private var launchAtLoginError: String?
     @State private var draggingTargetID: UUID?
 
     init(model: AppModel, onSave: @escaping () -> Void) {
@@ -60,6 +62,7 @@ struct SettingsView: View {
         _chartWindowMinutes = State(initialValue: settings.chartWindowSeconds / 60)
         _greenLatencyMs = State(initialValue: settings.greenLatencyMs)
         _blueLatencyMs = State(initialValue: settings.blueLatencyMs)
+        _launchAtLogin = State(initialValue: LaunchAtLogin.isEnabled)
     }
 
     var body: some View {
@@ -105,6 +108,19 @@ struct SettingsView: View {
                     Text("Health")
                     NumberField(title: "Green \u{2264}", value: $greenLatencyMs, suffix: "ms")
                     NumberField(title: "Blue \u{2264}", value: $blueLatencyMs, suffix: "ms")
+                }
+
+                GridRow {
+                    Text("Startup")
+                    // Login-item registration is system state, so it applies on toggle
+                    // rather than waiting for Save.
+                    Toggle("Launch at login", isOn: $launchAtLogin)
+                        .toggleStyle(.checkbox)
+                        .disabled(!LaunchAtLogin.isSupported)
+                        .onChange(of: launchAtLogin) { _, isOn in
+                            applyLaunchAtLogin(isOn)
+                        }
+                    launchAtLoginStatus
                 }
             }
 
@@ -194,6 +210,41 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var launchAtLoginStatus: some View {
+        if let launchAtLoginError {
+            Text(launchAtLoginError)
+                .font(.caption)
+                .foregroundStyle(Color.red)
+                .lineLimit(2)
+        } else if !LaunchAtLogin.isSupported {
+            Text("Needs the PingStats.app bundle")
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
+        } else if LaunchAtLogin.requiresApproval {
+            HStack(spacing: 6) {
+                Text("Approval needed")
+                    .foregroundStyle(Color.secondary)
+                Button("Open Login Items") {
+                    LaunchAtLogin.openLoginItemsSettings()
+                }
+            }
+            .font(.caption)
+        } else {
+            Color.clear.frame(height: 1)
+        }
+    }
+
+    private func applyLaunchAtLogin(_ isOn: Bool) {
+        do {
+            try LaunchAtLogin.setEnabled(isOn)
+            launchAtLoginError = nil
+        } catch {
+            launchAtLogin = LaunchAtLogin.isEnabled
+            launchAtLoginError = error.localizedDescription
+        }
+    }
+
     private func save() {
         let savedTargets = targets
             .map {
@@ -271,7 +322,7 @@ private struct NotifyLevelToggles: View {
         .font(.caption)
     }
 
-    private func toggle(_ title: String, level: NotifyLevel) -> some View {
+    private func toggle(_ title: LocalizedStringKey, level: NotifyLevel) -> some View {
         Toggle(title, isOn: Binding(
             get: { target.notifyLevels.contains(level) },
             set: { isOn in
@@ -319,9 +370,9 @@ private struct TargetDropDelegate: DropDelegate {
 }
 
 struct NumberField: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var value: Double
-    let suffix: String
+    let suffix: LocalizedStringKey
 
     var body: some View {
         HStack(spacing: 6) {

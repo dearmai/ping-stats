@@ -18,6 +18,13 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>ko</string>
+    </array>
     <key>CFBundleExecutable</key>
     <string>PingStats</string>
     <key>CFBundleIconFile</key>
@@ -49,6 +56,13 @@ if [[ ! -f "$ICON_SRC" ]]; then
 fi
 mkdir -p "$RESOURCES_DIR"
 cp "$ICON_SRC" "$RESOURCES_DIR/AppIcon.icns"
+
+# Localizations. Keys are the English UI text, so a missing .lproj just means
+# English; without this copy the app is English-only.
+for LPROJ in "$ROOT_DIR"/Resources/*.lproj; do
+    [[ -d "$LPROJ" ]] || continue
+    cp -R "$LPROJ" "$RESOURCES_DIR/"
+done
 
 # The Swift linker only applies a linker-signed ad-hoc signature that leaves the
 # Info.plist unbound, so macOS cannot resolve the bundle identity and silently

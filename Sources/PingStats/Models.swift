@@ -15,12 +15,12 @@ enum PingHealth: Int, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .green: "Good"
-        case .blue: "Normal"
-        case .yellow: "Warning"
-        case .orange: "Error"
-        case .red: "Critical"
-        case .unknown: "Unknown"
+        case .green: L10n.string("Good")
+        case .blue: L10n.string("Normal")
+        case .yellow: L10n.string("Warning")
+        case .orange: L10n.string("Error")
+        case .red: L10n.string("Critical")
+        case .unknown: L10n.string("Unknown")
         }
     }
 
@@ -53,8 +53,8 @@ enum NotifyLevel: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .warning: "Warning"
-        case .error: "Error"
+        case .warning: L10n.string("Warning")
+        case .error: L10n.string("Error")
         }
     }
 }
@@ -299,7 +299,7 @@ final class HostMonitor: ObservableObject, Identifiable {
 
     var latestLatencyText: String {
         guard let latency = samples.last?.latencyMs else { return "-" }
-        return "\(Int(latency.rounded())) ms"
+        return String(format: L10n.string("%d ms"), Int(latency.rounded()))
     }
 
     var average10Text: String {
@@ -307,7 +307,7 @@ final class HostMonitor: ObservableObject, Identifiable {
         let latencies = recent.compactMap(\.latencyMs)
         guard !latencies.isEmpty else { return "-" }
         let average = latencies.reduce(0, +) / Double(latencies.count)
-        return "\(Int(average.rounded())) ms avg"
+        return String(format: L10n.string("%d ms avg"), Int(average.rounded()))
     }
 
     func record(

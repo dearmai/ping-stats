@@ -10,6 +10,7 @@ struct MonitorView: View {
     static let maxHeight: CGFloat = 640
 
     private static let headerHeight: CGFloat = 44
+    private static let addressBarHeight: CGFloat = 26
     private static let gridPadding: CGFloat = 28
     private static let gridSpacing: CGFloat = 10
     private static let cardHeight: CGFloat = 112
@@ -23,6 +24,7 @@ struct MonitorView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            addressBar
 
             if model.monitors.isEmpty {
                 ContentUnavailableView("No Hosts", systemImage: "network.slash")
@@ -59,7 +61,8 @@ struct MonitorView: View {
 
         let rowCount = CGFloat((monitorCount + 1) / 2)
         let spacing = max(0, rowCount - 1) * gridSpacing
-        let contentHeight = headerHeight + gridPadding + (rowCount * cardHeight) + spacing
+        let contentHeight = headerHeight + addressBarHeight + gridPadding
+            + (rowCount * cardHeight) + spacing
         return min(max(contentHeight, minHeight), maxHeight)
     }
 
@@ -92,6 +95,67 @@ struct MonitorView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var addressBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "network")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            if model.localAddresses.isEmpty {
+                Text("No local address")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) {
+                        ForEach(model.localAddresses) { address in
+                            LocalAddressChip(address: address)
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
+            }
+        }
+        .frame(height: Self.addressBarHeight)
+        .padding(.horizontal, 14)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+struct LocalAddressChip: View {
+    let address: LocalAddress
+
+    @State private var didCopy = false
+
+    var body: some View {
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(address.address, forType: .string)
+            didCopy = true
+            Task {
+                try? await Task.sleep(for: .seconds(1.2))
+                didCopy = false
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(address.label)
+                    .foregroundStyle(.secondary)
+                Text(address.address)
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
+            }
+            .font(.caption2)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(didCopy
+            ? L10n.string("Copied")
+            : String(format: L10n.string("%@ · %@ — click to copy"), address.interface, address.address))
     }
 }
 
@@ -200,7 +264,7 @@ struct PingChart: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(alignment: .topTrailing) {
-            Text("\(Int(windowSeconds / 60)) min")
+            Text(String(format: L10n.string("%d min"), Int(windowSeconds / 60)))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .padding(4)

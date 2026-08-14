@@ -31,6 +31,16 @@ macOS menu bar app that periodically pings configured hosts and shows their heal
   - Warm-up settling into normal (gray to green/blue) is reported once monitoring stabilizes.
   - No notification for green to blue or blue to green, for moving back into the warming-up gray state, or for a target that is already down at launch (gray straight to an error state); only its later recovery is reported.
 - Popover chart with current `HH:mm:ss` time and recent 5-minute response history.
+- Local IP bar in the popover: every up, non-loopback interface with a routable
+  address (Wi-Fi, Ethernet, VPN tunnels, …), named as in Network settings, IPv4 first.
+  Link-local (`169.254.*`, `fe80::`) addresses are hidden; click an address to copy it.
+- `Launch at login` checkbox in settings, backed by `SMAppService`. It applies
+  immediately instead of waiting for Save, and needs the `.app` bundle — the checkbox
+  is disabled under bare `swift run`. If macOS marks the item as needing approval,
+  the settings row links straight to System Settings > General > Login Items.
+- Korean and English UI, following the system language. Translations live in
+  `Resources/ko.lproj/Localizable.strings` and are copied into the bundle by
+  `scripts/build-app.sh`; running without the bundle shows the English text.
 
 ## Build
 

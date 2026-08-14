@@ -1,0 +1,63 @@
+/* PingStats Korean UI strings. Keys are the English UI text. */
+
+/* Health bands */
+"Good" = "양호";
+"Normal" = "보통";
+"Warning" = "경고";
+"Error" = "오류";
+"Critical" = "심각";
+"Unknown" = "확인 중";
+
+/* Popover */
+"No Hosts" = "대상 없음";
+"Ping now" = "지금 확인";
+"Settings" = "설정";
+"Quit" = "종료";
+"No local address" = "로컬 주소 없음";
+"Copied" = "복사됨";
+"%@ · %@ — click to copy" = "%1$@ · %2$@ — 클릭하면 복사";
+"%d min" = "%d분";
+"%d ms" = "%d ms";
+"%d ms avg" = "평균 %d ms";
+
+/* Status item tooltip */
+"%@ [%@]: %@ (%@)" = "%1$@ [%2$@]: %3$@ (%4$@)";
+
+/* Notifications */
+"PingStats: %@" = "PingStats: %@";
+"PingStats: %@ recovered" = "PingStats: %@ 복구됨";
+"%@ → %@" = "%1$@ → %2$@";
+
+/* Settings window */
+"PingStats Settings" = "PingStats 설정";
+"Targets" = "대상";
+"Add target" = "대상 추가";
+"Use" = "사용";
+"Name" = "이름";
+"Address" = "주소";
+"Notify" = "알림";
+"Drag to reorder" = "드래그해서 순서 변경";
+"Enable target" = "대상 사용";
+"IP, IP:port, or URL" = "IP, IP:포트 또는 URL";
+"All" = "전체";
+"Enable every level" = "모든 등급 켜기";
+"Background" = "백그라운드";
+"Foreground" = "포그라운드";
+"Chart" = "차트";
+"Health" = "상태";
+"Startup" = "시작";
+"Interval" = "주기";
+"Timeout" = "타임아웃";
+"Window" = "범위";
+"sec" = "초";
+"min" = "분";
+"ms" = "ms";
+"1-60 min" = "1~60분";
+"Green ≤" = "초록 ≤";
+"Blue ≤" = "파랑 ≤";
+"Launch at login" = "로그인 시 실행";
+"Needs the PingStats.app bundle" = "PingStats.app 번들 필요";
+"Approval needed" = "승인 필요";
+"Open Login Items" = "로그인 항목 열기";
+"Launch at login needs the packaged PingStats.app bundle." = "로그인 시 실행은 패키징된 PingStats.app 번들에서만 동작합니다.";
+"Save" = "저장";

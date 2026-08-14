@@ -65,7 +65,13 @@ final class StatusBarController: NSObject {
         statusItem.button?.image = image
         statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.toolTip = model.monitors.map {
-            "\($0.title) [\($0.address)]: \($0.latestLatencyText) (\($0.health.title))"
+            String(
+                format: L10n.string("%@ [%@]: %@ (%@)"),
+                $0.title,
+                $0.address,
+                $0.latestLatencyText,
+                $0.health.title
+            )
         }.joined(separator: "\n")
     }
 

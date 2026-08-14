@@ -42,6 +42,10 @@ All source under `Sources/PingStats/`:
 - `Models.swift` — domain types: `PingHealth`, `PingSample`, `PingTarget`, `ProbeMode`,
   `PingSettings` (persistence + normalization), and `HostMonitor` (per-target sample buffer
   + health evaluation).
+- `LaunchAtLogin.swift` — `SMAppService.mainApp` wrapper for the login-item toggle.
+- `NetworkInterfaces.swift` — `getifaddrs` sweep behind `LocalAddressProvider.current()`,
+  plus the SystemConfiguration BSD-name → "Wi-Fi" display-name lookup.
+- `Localization.swift` — `L10n.string(_:)` for non-literal UI strings.
 - `PingService.swift` — stateless probe engine. `ProbeAddress.parse` routes an address to
   HTTP (`http(s)://…`), TCP connect (`host:port`), or ICMP (`/sbin/ping` subprocess).
   `PingContinuationBox` guards against double-resume of the continuation.
@@ -77,6 +81,22 @@ row-major with the top row first.
 
 **Address modes** (`PingTarget.probeMode` / `ProbeAddress.parse`): `http(s)://` → HTTP
 status check (2xx/3xx ok); `host:port` → TCP connect latency; otherwise → ICMP ping.
+
+**Local IP bar** (`LocalAddressProvider` → `AppModel.localAddresses` → `MonitorView`):
+`getifaddrs` over every `IFF_UP`, non-loopback interface, skipping link-local
+(`169.254.*`, `fe80::`) and `::1`; sorted named-NIC-first, then IPv4 before IPv6.
+Refreshed on every tick with an equality guard so the popover only redraws on change.
+
+**Launch at login** (`LaunchAtLogin`): `SMAppService.mainApp` is the source of truth —
+never mirrored into `PingSettings`. The settings checkbox applies on toggle, not on Save,
+and is disabled unless the executable is inside a `.app` with a bundle id.
+
+**Localization**: the English UI text *is* the key, so SwiftUI `LocalizedStringKey`
+literals localize themselves; non-literal sites (enum titles, `String(format:)`, AppKit
+window/tooltip strings) go through `L10n.string(_:)`. Translations live in
+`Resources/<lang>.lproj/Localizable.strings` and are copied into the bundle by
+`scripts/build-app.sh` (with `CFBundleLocalizations`); a missing bundle falls back to
+English. New user-facing text means a new key in `Resources/ko.lproj/Localizable.strings`.
 
 **Persistence**: `PingSettings` is JSON in `UserDefaults` under `PingStats.settings.v1`,
 with a `LegacyPingSettings` migration path. `.normalized()` clamps intervals/timeouts and
