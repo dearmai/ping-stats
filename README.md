@@ -19,7 +19,13 @@ macOS menu bar app that periodically pings configured hosts and shows their heal
   - Orange: at least one timeout or network error in the recent 10 samples.
   - Red: at least 4 errors in the recent 5 samples.
   - Gray: warming up, fewer than 10 samples and no errors yet.
-- User notification rules:
+- Menu bar layout: one row of bars up to 9 targets; from 10 targets the bars wrap into a
+  2-row grid with a 1 px gap, filled left to right, top row first.
+- Per-target notification levels, set in the settings window:
+  - `Warning` covers the yellow state, `Error` covers orange and red, `All` turns both on.
+  - Unchecking a level silences that target for that severity, including its recovery back
+    to normal from that state.
+- User notification rules (applied on top of the per-target levels):
   - Any health-band change: normal (green/blue) to a warning/error state, and recovery back to normal.
   - Any severity change among yellow, orange, and red.
   - Warm-up settling into normal (gray to green/blue) is reported once monitoring stabilizes.

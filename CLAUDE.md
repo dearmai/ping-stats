@@ -66,6 +66,14 @@ yellow/orange/red. Warm-up settling into normal (`.unknown` → green/blue) also
 Suppressed: moving *into* `.unknown`, `.unknown` → abnormal (a target already down at
 launch stays quiet until it recovers), and green↔blue flapping. Recovery from a real
 problem (abnormal, non-`.unknown` → normal) sets a distinct "recovered" title.
+On top of that, each target carries `notifyLevels: Set<NotifyLevel>` (`.warning` = yellow,
+`.error` = orange/red; the settings "All" checkbox just sets both). An abnormal band is
+reported only if its level is enabled; a return to normal follows the band being *left*,
+and a warm-up settle needs any level enabled.
+
+**Status bar layout** (`StatusBarImageRenderer`): under 10 targets keeps the original
+single row (7 px pitch); from 10 it switches to a 2-row grid, 1 px gap both axes,
+row-major with the top row first.
 
 **Address modes** (`PingTarget.probeMode` / `ProbeAddress.parse`): `http(s)://` → HTTP
 status check (2xx/3xx ok); `host:port` → TCP connect latency; otherwise → ICMP ping.

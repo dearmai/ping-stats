@@ -61,7 +61,7 @@ final class AppModel: ObservableObject {
                         blueThresholdMs: settings.blueLatencyMs
                     )
                     monitor.isPinging = false
-                    notifyIfNeeded(host: monitor.title, old: transition.old, new: transition.new)
+                    notifyIfNeeded(target: monitor.target, old: transition.old, new: transition.new)
                 }
             }
         }
@@ -93,7 +93,7 @@ final class AppModel: ObservableObject {
         pingNow()
     }
 
-    private func notifyIfNeeded(host: String, old: PingHealth, new: PingHealth) {
+    private func notifyIfNeeded(target: PingTarget, old: PingHealth, new: PingHealth) {
         // Alert on any band change except:
         //  - moving INTO .unknown (samples aged out / warming up again)
         //  - green <-> blue flapping (both normal, low signal)
@@ -106,6 +106,15 @@ final class AppModel: ObservableObject {
             && !(old.isNormal && new.isNormal)
         guard shouldNotify else { return }
 
+        // Per-target level filter: an abnormal band notifies only when its level is
+        // enabled; returning to normal follows the band being left, and a warm-up
+        // settle (no band to follow) needs at least one level enabled.
+        let allowedByTarget = new.isNormal
+            ? (old == .unknown ? !target.notifyLevels.isEmpty : target.notifies(old))
+            : target.notifies(new)
+        guard allowedByTarget else { return }
+
+        let host = target.title
         let recovered = old != .unknown && !old.isNormal && new.isNormal
         let content = UNMutableNotificationContent()
         content.title = recovered ? "PingStats: \(host) recovered" : "PingStats: \(host)"

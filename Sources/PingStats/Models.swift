@@ -47,17 +47,37 @@ struct PingSample: Codable, Identifiable, Equatable {
     }
 }
 
+enum NotifyLevel: String, Codable, CaseIterable {
+    case warning
+    case error
+
+    var title: String {
+        switch self {
+        case .warning: "Warning"
+        case .error: "Error"
+        }
+    }
+}
+
 struct PingTarget: Codable, Equatable, Identifiable {
     var id: UUID
     var name: String
     var address: String
     var isEnabled: Bool
+    var notifyLevels: Set<NotifyLevel>
 
-    init(id: UUID = UUID(), name: String = "", address: String, isEnabled: Bool = true) {
+    init(
+        id: UUID = UUID(),
+        name: String = "",
+        address: String,
+        isEnabled: Bool = true,
+        notifyLevels: Set<NotifyLevel> = [.warning, .error]
+    ) {
         self.id = id
         self.name = name
         self.address = address
         self.isEnabled = isEnabled
+        self.notifyLevels = notifyLevels
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -65,6 +85,7 @@ struct PingTarget: Codable, Equatable, Identifiable {
         case name
         case address
         case isEnabled
+        case notifyLevels
     }
 
     init(from decoder: Decoder) throws {
@@ -73,6 +94,19 @@ struct PingTarget: Codable, Equatable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         address = try container.decode(String.self, forKey: .address)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        // Added after v1 shipped; older targets notify on everything.
+        notifyLevels = try container.decodeIfPresent(Set<NotifyLevel>.self, forKey: .notifyLevels)
+            ?? [.warning, .error]
+    }
+
+    /// Whether an abnormal band is subscribed. Yellow is the warning level,
+    /// orange/red the error level; normal and warm-up bands are never a source.
+    func notifies(_ health: PingHealth) -> Bool {
+        switch health {
+        case .yellow: notifyLevels.contains(.warning)
+        case .orange, .red: notifyLevels.contains(.error)
+        default: false
+        }
     }
 
     var title: String {
@@ -98,7 +132,8 @@ struct PingTarget: Codable, Equatable, Identifiable {
             id: id,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             address: address.trimmingCharacters(in: .whitespacesAndNewlines),
-            isEnabled: isEnabled
+            isEnabled: isEnabled,
+            notifyLevels: notifyLevels
         )
     }
 }

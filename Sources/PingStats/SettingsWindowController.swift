@@ -25,7 +25,7 @@ final class SettingsWindowController {
         let newWindow = NSWindow(contentViewController: hostingController)
         newWindow.title = "PingStats Settings"
         newWindow.styleMask = [.titled, .closable, .miniaturizable]
-        newWindow.setContentSize(NSSize(width: 560, height: 420))
+        newWindow.setContentSize(NSSize(width: 660, height: 440))
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
         window = newWindow
@@ -119,7 +119,7 @@ struct SettingsView: View {
             }
         }
         .padding(18)
-        .frame(width: 560, height: 420)
+        .frame(width: 660, height: 440)
     }
 
     private var targetEditor: some View {
@@ -134,10 +134,14 @@ struct SettingsView: View {
                 Text("Name")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 150, alignment: .leading)
+                    .frame(width: 130, alignment: .leading)
                 Text("Address")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text("Notify")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 180, alignment: .leading)
                 Spacer()
                     .frame(width: 24)
             }
@@ -165,10 +169,13 @@ struct SettingsView: View {
 
                             TextField("Name", text: $target.name)
                                 .textFieldStyle(.roundedBorder)
-                                .frame(width: 150)
+                                .frame(width: 130)
 
                             TextField("IP, IP:port, or URL", text: $target.address)
                                 .textFieldStyle(.roundedBorder)
+
+                            NotifyLevelToggles(target: $target)
+                                .frame(width: 180, alignment: .leading)
                         }
                         .onDrop(
                             of: [UTType.text],
@@ -194,7 +201,8 @@ struct SettingsView: View {
                     id: $0.id,
                     name: $0.name,
                     address: $0.address,
-                    isEnabled: $0.isEnabled
+                    isEnabled: $0.isEnabled,
+                    notifyLevels: $0.notifyLevels
                 )
                 .normalized
             }
@@ -219,12 +227,20 @@ private struct EditableTarget: Identifiable {
     var name: String
     var address: String
     var isEnabled: Bool
+    var notifyLevels: Set<NotifyLevel>
 
-    init(id: UUID = UUID(), name: String, address: String, isEnabled: Bool = true) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        address: String,
+        isEnabled: Bool = true,
+        notifyLevels: Set<NotifyLevel> = [.warning, .error]
+    ) {
         self.id = id
         self.name = name
         self.address = address
         self.isEnabled = isEnabled
+        self.notifyLevels = notifyLevels
     }
 
     init(_ target: PingTarget) {
@@ -232,6 +248,40 @@ private struct EditableTarget: Identifiable {
         name = target.name
         address = target.address
         isEnabled = target.isEnabled
+        notifyLevels = target.notifyLevels
+    }
+}
+
+private struct NotifyLevelToggles: View {
+    @Binding var target: EditableTarget
+
+    var body: some View {
+        HStack(spacing: 8) {
+            toggle("Warning", level: .warning)
+            toggle("Error", level: .error)
+            Toggle("All", isOn: Binding(
+                get: { NotifyLevel.allCases.allSatisfy(target.notifyLevels.contains) },
+                set: { isOn in
+                    target.notifyLevels = isOn ? Set(NotifyLevel.allCases) : []
+                }
+            ))
+            .help("Enable every level")
+        }
+        .toggleStyle(.checkbox)
+        .font(.caption)
+    }
+
+    private func toggle(_ title: String, level: NotifyLevel) -> some View {
+        Toggle(title, isOn: Binding(
+            get: { target.notifyLevels.contains(level) },
+            set: { isOn in
+                if isOn {
+                    target.notifyLevels.insert(level)
+                } else {
+                    target.notifyLevels.remove(level)
+                }
+            }
+        ))
     }
 }
 
