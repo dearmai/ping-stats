@@ -38,6 +38,7 @@
 "Notify" = "알림";
 "Drag to reorder" = "드래그해서 순서 변경";
 "Enable target" = "대상 사용";
+"Delete target" = "대상 삭제";
 "IP, IP:port, or URL" = "IP, IP:포트 또는 URL";
 "All" = "전체";
 "Enable every level" = "모든 등급 켜기";

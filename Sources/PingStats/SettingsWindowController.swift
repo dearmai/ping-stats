@@ -192,6 +192,16 @@ struct SettingsView: View {
 
                             NotifyLevelToggles(target: $target)
                                 .frame(width: 180, alignment: .leading)
+
+                            Button {
+                                removeTarget(id: target.id)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24)
+                            .help("Delete target")
                         }
                         .onDrop(
                             of: [UTType.text],
@@ -242,6 +252,13 @@ struct SettingsView: View {
         } catch {
             launchAtLogin = LaunchAtLogin.isEnabled
             launchAtLoginError = error.localizedDescription
+        }
+    }
+
+    private func removeTarget(id: UUID) {
+        targets.removeAll { $0.id == id }
+        if draggingTargetID == id {
+            draggingTargetID = nil
         }
     }
 
