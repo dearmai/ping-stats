@@ -20,7 +20,8 @@ def desktop_entry(launcher):
         escaped = escaped.replace(character, "\\" + character)
     escaped = escaped.replace("\\", "\\\\")
     return ('[Desktop Entry]\nType=Application\nName=PingStats\n'
-            'Comment=Network latency monitor\nExec="' + escaped + '"\n'
+            'Name[ko]=PingStats\nComment=Network latency monitor\n'
+            'Comment[ko]=네트워크 응답 시간 모니터\nExec="' + escaped + '"\n'
             'Icon=network-transmit-receive\nTerminal=false\nCategories=Network;Monitor;\n'
             'StartupNotify=true\nX-GNOME-UsesNotifications=true\n')
 

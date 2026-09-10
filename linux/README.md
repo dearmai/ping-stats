@@ -13,6 +13,13 @@ sudo dnf install python3 python3-gobject python3-cairo gtk3 iputils iproute liba
 make linux-run
 ```
 
+다른 폴더에서 실행할 때는 프로젝트 경로를 지정하세요.
+
+```sh
+make -C /work/ping-stats linux-install
+make -C /work/ping-stats linux-run
+```
+
 `libayatana-appindicator-gtk3`도 지원합니다. 추가 저장소가 필요한 패키지는 해당
 시스템의 패키지 정책에 맞춰 설치하세요. 개발 기준 시스템에는 GTK와 두 indicator
 라이브러리 모두 설치되어 있습니다.
@@ -60,6 +67,24 @@ UserDefaults에서 추출한 현재 형식 JSON을 가져올 수 있습니다. �
 덮어쓰지 않고 오류를 표시합니다. macOS UserDefaults 자동 이전은 제공하지 않습니다.
 
 ## GNOME에서 달라지는 부분
+
+### 표시 언어
+
+한국어 시스템과 언어가 지정되지 않은 `C`/`C.UTF-8` 환경에서는 한국어로 표시합니다.
+영어 시스템에서는 영어를 사용합니다. `LANGUAGE`에 지원 언어가 있으면 우선 적용하며,
+`PINGSTATS_LANGUAGE`로 앱 언어를 명시적으로 선택할 수 있습니다.
+
+```sh
+PINGSTATS_LANGUAGE=ko make linux-run
+PINGSTATS_LANGUAGE=en make linux-run
+```
+
+언어를 바꿀 때는 실행 중인 PingStats를 **종료**한 뒤 다시 실행하세요.
+앱 메뉴·설정·알림·차트 시간 단위와 앱 자체 오류 안내를 번역합니다.
+운영체제와 네트워크 라이브러리의 상세 오류는 진단을 위해 원문을 보존하며,
+파일 선택기 내부의 기본 항목은 시스템 GTK 언어 설정에 따릅니다.
+
+### 화면과 시스템 연동
 
 상단 아이콘은 GNOME이 할당하는 정사각형 영역에 호스트별 색상 막대를 그립니다.
 10개부터 2행이며 대상이 많으면 막대가 작아집니다. macOS처럼 아이콘 폭이 늘어나거나

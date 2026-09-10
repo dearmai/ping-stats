@@ -7,11 +7,12 @@ from pathlib import Path
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gio, GLib, Gtk, Gdk
+gi.require_version("PangoCairo", "1.0")
+from gi.repository import Gio, GLib, Gtk, Gdk, Pango, PangoCairo
 
 from .core import DEFAULTS, NORMAL, Sample, evaluate, load_settings, normalize, save_settings, should_notify, target
 from .desktop import APP_ID, autostart_path, set_autostart
-from .i18n import tr
+from .i18n import tr, error_text
 from .probe import local_addresses, probe
 
 COLORS = dict(green="#34c759", blue="#007aff", yellow="#e8be00", orange="#ff9500", red="#ff3b30", unknown="#8e8e93")
@@ -29,7 +30,8 @@ def button(label, callback):
 
 def message(parent, text):
     dialog = Gtk.MessageDialog(transient_for=parent, modal=True, message_type=Gtk.MessageType.ERROR,
-                               buttons=Gtk.ButtonsType.CLOSE, text=str(text))
+                               buttons=Gtk.ButtonsType.NONE, text=error_text(text))
+    dialog.add_button(tr("Close"), Gtk.ResponseType.CLOSE)
     dialog.run()
     dialog.destroy()
 
@@ -159,7 +161,7 @@ class App(Gtk.Application):
         try:
             self.settings = load_settings()
         except (OSError, ValueError, TypeError) as error:
-            message(None, tr("Settings could not be loaded") + "\n" + str(error))
+            message(None, tr("Settings could not be loaded") + "\n" + error_text(error))
             self.quit()
             return
         self.hold()
@@ -336,7 +338,7 @@ class App(Gtk.Application):
         average = "%.0f ms" % (sum(values) / len(values)) if values else "—"
         monitor["label"].set_markup('<span foreground="%s">● %s</span>  %s: %s · %s: %s' % (
             COLORS[monitor["health"]], tr(TITLES[monitor["health"]]), tr("Latest"), latest, tr("Average (10)"), average))
-        monitor["label"].set_tooltip_text(samples[-1].error if samples else None)
+        monitor["label"].set_tooltip_text(error_text(samples[-1].error) if samples and samples[-1].error else None)
         monitor["chart"].queue_draw()
 
     def draw_chart(self, widget, context, monitor):
@@ -350,13 +352,15 @@ class App(Gtk.Application):
         context.stroke()
         samples = monitor["samples"]
         ceiling = max([100] + [s.latency for s in samples if s.latency is not None]) * 1.1
-        context.set_font_size(10)
-        context.move_to(1, top)
-        context.show_text("%.0f ms" % ceiling)
-        context.move_to(left, height - 5)
-        context.show_text("-%g min" % (self.settings["chartWindowSeconds"] / 60))
-        context.move_to(right - 45, height - 5)
-        context.show_text(time.strftime("%H:%M:%S"))
+        def caption(text, x, y):
+            layout = PangoCairo.create_layout(context)
+            layout.set_font_description(Pango.FontDescription("Sans 8"))
+            layout.set_text(text, -1)
+            context.move_to(x, y)
+            PangoCairo.show_layout(context, layout)
+        caption("%.0f ms" % ceiling, 1, top - 14)
+        caption(tr("-%g min") % (self.settings["chartWindowSeconds"] / 60), left, height - 17)
+        caption(time.strftime("%H:%M:%S"), right - 50, height - 17)
         cutoff = time.time() - self.settings["chartWindowSeconds"]
         connected = False
         for sample in samples:
