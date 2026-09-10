@@ -4,3 +4,5 @@ dist/
 docs/.claudian/
 docs/.obsidian/
 .DS_Store
+__pycache__/
+*.pyc

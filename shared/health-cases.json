@@ -1,0 +1,15 @@
+[
+  {"name":"empty", "latencies":[], "expected":"unknown"},
+  {"name":"warmup", "latencies":[10,10,10,10,10,10,10,10,10], "expected":"unknown"},
+  {"name":"good", "latencies":[10,10,10,10,10,10,10,10,10,10], "expected":"green"},
+  {"name":"green boundary", "latencies":[60,60,60,60,60,60,60,60,60,60], "expected":"blue"},
+  {"name":"blue boundary", "latencies":[120,120,120,120,120,120,120,120,120,120], "expected":"yellow"},
+  {"name":"initial failure", "latencies":[null], "expected":"orange"},
+  {"name":"critical during warmup", "latencies":[null,null,null,null], "expected":"red"},
+  {"name":"four of five", "latencies":[null,null,10,null,null], "expected":"red"},
+  {"name":"three of five", "latencies":[null,null,10,10,null], "expected":"orange"},
+  {"name":"error ages out", "latencies":[null,10,10,10,10,10,10,10,10,10,10], "expected":"green"},
+  {"name":"error still in ten", "latencies":[null,10,10,10,10,10,10,10,10,10], "expected":"orange"},
+  {"name":"reversed thresholds", "latencies":[70,70,70,70,70,70,70,70,70,70], "green":60, "blue":30, "expected":"yellow"},
+  {"name":"custom thresholds", "latencies":[70,70,70,70,70,70,70,70,70,70], "green":80, "blue":160, "expected":"green"}
+]

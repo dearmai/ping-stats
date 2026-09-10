@@ -1,5 +1,9 @@
 # PingStats
 
+**Linux:** Rocky Linux 9.8 / GNOME용 구현은 [`linux/`](linux/README.md)에 있습니다.
+`make linux-run`으로 실행하고 `make linux-install`로 사용자 계정에 설치합니다.
+아래 내용은 기존 macOS 앱 안내입니다.
+
 PingStats는 macOS 메뉴바에서 동작하는 네이티브 앱입니다. 등록한 호스트로 주기적으로 ping을 보내고, 각 호스트의 상태를 메뉴바의 세로 컬러 바로 표시합니다.
 
 [English README](README.md)

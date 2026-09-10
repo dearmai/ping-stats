@@ -1,0 +1,5 @@
+#!/usr/bin/python3
+import sys
+from pingstats.app import main
+
+sys.exit(main())

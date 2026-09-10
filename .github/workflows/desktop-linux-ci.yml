@@ -1,0 +1,22 @@
+name: Desktop Linux checks
+
+on:
+  push:
+    paths: ['linux/**', 'shared/**', '.github/workflows/desktop-linux-ci.yml']
+  pull_request:
+    paths: ['linux/**', 'shared/**', '.github/workflows/desktop-linux-ci.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: rockylinux:9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: dnf install -y python3 iputils
+      - name: Test rules and local probes on Rocky Linux 9
+        run: PYTHONPATH=linux /usr/bin/python3 -m unittest discover -s linux/tests -v

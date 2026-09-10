@@ -5,6 +5,19 @@ INSTALLED_APP := $(INSTALL_DIR)/$(APP_NAME).app
 
 .DEFAULT_GOAL := help
 
+.PHONY: linux-run linux-install linux-test linux-smoke
+linux-run: ## Linux GTK 앱 실행
+	/usr/bin/python3 linux/pingstats-linux
+
+linux-install: ## Linux 앱을 현재 사용자 계정에 설치
+	/usr/bin/python3 linux/install.py
+
+linux-test: ## Linux 상태 규칙·설정·네트워크 검사 테스트
+	PYTHONPATH=linux /usr/bin/python3 -m unittest discover -s linux/tests -v
+
+linux-smoke: ## Linux 그래픽 세션에서 UI 검증
+	/usr/bin/python3 linux/tests/smoke_gui.py
+
 .PHONY: help
 help: ## 지원하는 명령 목록 표시
 	@echo "$(APP_NAME) - 사용 가능한 make 명령:"

@@ -1,5 +1,9 @@
 # PingStats
 
+**Linux:** A Rocky Linux 9.8 / GNOME implementation is available in
+[`linux/`](linux/README.md). Run `make linux-run` or install for the current user
+with `make linux-install`. The documentation below describes the macOS app.
+
 macOS menu bar app that periodically pings configured hosts and shows their health as vertical colored bars in the menu bar.
 
 [한국어 README](README.ko.md)
