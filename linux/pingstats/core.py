@@ -94,6 +94,17 @@ class Sample:
         return self.error is not None or self.latency is None
 
 
+SPARK = "▁▂▃▄▅▆▇█"
+
+
+def sparkline(samples, ceiling, width=20):
+    """Recent latencies as text. The scale reaches at least the blue threshold so
+    spikes stand out, and is square-rooted so healthy jitter still has a shape."""
+    recent = samples[-width:]
+    top = max([ceiling, 1] + [s.latency for s in recent if not s.failed])
+    return "".join("×" if s.failed else SPARK[min(7, int(math.sqrt(s.latency / top) * 8))] for s in recent)
+
+
 def evaluate(samples, green=60, blue=120):
     if sum(s.failed for s in samples[-5:]) >= 4:
         return "red"

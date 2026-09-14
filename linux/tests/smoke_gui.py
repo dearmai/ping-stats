@@ -8,8 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 with tempfile.TemporaryDirectory(prefix="pingstats-smoke-") as directory:
     os.environ["XDG_CONFIG_HOME"] = directory
-    from pingstats.core import normalize, save_settings, target
-    from pingstats.app import App, Settings, GLib
+    from pingstats.core import SPARK, normalize, save_settings, target
+    from pingstats.app import App, GLYPHS, Settings, GLib
     save_settings(normalize(dict(targets=[dict(target("127.0.0.1", "Loopback"), notifyLevels=[])])))
     app = App()
     app.set_application_id("dev.pingstats.smoke")
@@ -23,6 +23,13 @@ with tempfile.TemporaryDirectory(prefix="pingstats-smoke-") as directory:
             assert monitor["samples"], "No probe completed"
             assert monitor["samples"][-1].error is None
             assert Path(app.indicator.get_icon()).is_file()
+            assert monitor["item"].get_label().startswith(GLYPHS[monitor["health"]]), monitor["item"].get_label()
+            assert any(mark in monitor["item"].get_label() for mark in SPARK + "×")
+            app.overview.toggle()
+            assert app.overview.get_visible()
+            assert monitor["mini"].get_visible()
+            app.overview.toggle()
+            assert not app.overview.get_visible()
             dialog = Settings(app)
             dialog.show_all()
             assert dialog.collect() == app.settings
@@ -30,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix="pingstats-smoke-") as directory:
             app.hide_window()
             assert not app.window.get_visible()
             app.window.present()
-            print("PASS: GTK window, chart, settings, indicator, loopback probe, hide/reopen")
+            print("PASS: GTK window, chart, tray menu chart, popover, settings, indicator, loopback probe, hide/reopen")
         except Exception as error:
             failures.append(str(error))
         finally:

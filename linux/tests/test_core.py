@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from pingstats.core import Sample, evaluate, load_settings, normalize, save_settings, should_notify
+from pingstats.core import Sample, evaluate, load_settings, normalize, save_settings, should_notify, sparkline
 
 
 class CoreTests(unittest.TestCase):
@@ -39,6 +39,14 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(should_notify("red", "blue", ["error"]))
         self.assertFalse(should_notify("green", "yellow", ["error"]))
         self.assertTrue(should_notify("unknown", "green", ["error"]))
+
+    def test_sparkline_scales_against_the_blue_threshold(self):
+        samples = [Sample(0, 10), Sample(1, 60), Sample(2, 120), Sample(3, None, "down")]
+        self.assertEqual(sparkline(samples, 120), "▃▆█×")
+        # A spike above the threshold stretches the scale, so normal latency flattens.
+        self.assertEqual(sparkline(samples + [Sample(4, 1200)], 120), "▁▂▃×█")
+        self.assertEqual(sparkline(samples, 120, width=2), "█×")
+        self.assertEqual(sparkline([], 120), "")
 
     def test_settings_roundtrip_and_bounds(self):
         with tempfile.TemporaryDirectory() as directory:

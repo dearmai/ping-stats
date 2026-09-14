@@ -27,6 +27,7 @@ TRANSLATIONS = {
     "Foreground interval (s)": "창 표시 중 검사 주기 (초)", "Foreground timeout (s)": "창 표시 중 제한 시간 (초)",
     "Chart window (s)": "차트 표시 기간 (초)", "Green threshold (ms)": "초록 임계값 (ms)",
     "Blue threshold (ms)": "파랑 임계값 (ms)", "No targets. Add one in Settings.": "설정에서 검사 대상을 추가하세요.",
+    "Chart": "차트", "Average": "평균", "Close chart": "차트 닫기",
     "Local IP": "내 IP", "Copied": "복사됨", "Recovered": "복구됨", "Good": "좋음", "Normal": "정상",
     "Critical": "심각", "Unknown": "준비 중", "Latest": "최근", "Average (10)": "평균 (10건)",
     "Settings could not be loaded": "설정을 불러올 수 없습니다", "Close": "닫기",

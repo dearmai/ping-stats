@@ -1,3 +1,4 @@
+import hashlib
 import math
 import sys
 import tempfile
@@ -10,12 +11,14 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gio, GLib, Gtk, Gdk, Pango, PangoCairo
 
-from .core import DEFAULTS, NORMAL, Sample, evaluate, load_settings, normalize, save_settings, should_notify, target
+from .core import (DEFAULTS, NORMAL, Sample, evaluate, load_settings, normalize, save_settings,
+                   should_notify, sparkline, target)
 from .desktop import APP_ID, autostart_path, set_autostart
 from .i18n import tr, error_text
 from .probe import local_addresses, probe
 
 COLORS = dict(green="#34c759", blue="#007aff", yellow="#e8be00", orange="#ff9500", red="#ff3b30", unknown="#8e8e93")
+GLYPHS = dict(green="🟢", blue="🔵", yellow="🟡", orange="🟠", red="🔴", unknown="⚪")
 TITLES = dict(green="Good", blue="Normal", yellow="Warning", orange="Error", red="Critical", unknown="Unknown")
 FIELDS = list(zip(DEFAULTS, ("Background interval (s)", "Background timeout (s)",
                            "Foreground interval (s)", "Foreground timeout (s)",
@@ -140,6 +143,58 @@ class Settings(Gtk.Dialog):
         dialog.destroy()
 
 
+class Overview(Gtk.Window):
+    """Compact chart layer opened from the tray, mirroring the macOS popover."""
+
+    def __init__(self, app):
+        super().__init__(title="PingStats")
+        self.app = app
+        self.set_decorated(False)
+        self.set_resizable(False)
+        self.set_keep_above(True)
+        self.set_skip_taskbar_hint(True)
+        self.set_skip_pager_hint(True)
+        self.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+        frame = Gtk.Frame(shadow_type=Gtk.ShadowType.OUT)
+        self.rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin=12)
+        frame.add(self.rows)
+        self.add(frame)
+        self.connect("delete-event", lambda *_: self.hide_on_delete())
+        self.connect("focus-out-event", lambda *_: self.hide_on_delete())
+        self.connect("key-press-event", lambda _, event: event.keyval == Gdk.KEY_Escape and self.hide_on_delete())
+
+    def rebuild(self):
+        for child in self.rows.get_children():
+            child.destroy()
+        for monitor in self.app.monitors.values():
+            summary = Gtk.Label(xalign=0)
+            chart = Gtk.DrawingArea()
+            chart.set_size_request(280, 60)
+            chart.connect("draw", self.app.draw_chart, monitor, True)
+            monitor["summary"], monitor["mini"] = summary, chart
+            self.rows.pack_start(summary, False, False, 0)
+            self.rows.pack_start(chart, False, False, 0)
+            self.app.render_monitor(monitor)
+        if not self.app.monitors:
+            self.rows.pack_start(Gtk.Label(label=tr("No targets. Add one in Settings.")), False, False, 0)
+        self.rows.pack_start(Gtk.Label(label=tr("Close chart") + " (Esc)"), False, False, 0)
+        self.rows.show_all()
+
+    def toggle(self):
+        if self.get_visible():
+            self.hide()
+            return
+        self.rebuild()
+        self.show_all()
+        # GNOME hands the tray no position, so anchor under the panel on the icon side.
+        area = (Gdk.Display.get_default().get_primary_monitor() or
+                Gdk.Display.get_default().get_monitor(0)).get_workarea()
+        size = self.get_preferred_size()[1]
+        self.move(area.x + max(0, area.width - size.width - 12), area.y + 12)
+        self.present()
+        self.app.next_probe = 0
+
+
 class App(Gtk.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
@@ -151,8 +206,10 @@ class App(Gtk.Application):
         self.address_pending = False
         self.stopping = False
         self.icons = tempfile.TemporaryDirectory(prefix="pingstats-icons-")
-        self.icon_serial = 0
         self.icon_state = None
+        self.indicator = None
+        self.menu = None
+        self.overview = None
 
     def do_activate(self):
         if self.window:
@@ -186,6 +243,7 @@ class App(Gtk.Application):
         box.pack_start(scroller, True, True, 0)
         box.pack_start(Gtk.Label(label=tr("Monitoring continues when this window is closed.")), False, False, 0)
         box.pack_start(Gtk.Label(label=tr("Tray support requires the GNOME AppIndicator extension.")), False, False, 0)
+        self.overview = Overview(self)
         self.reconcile()
         self.setup_indicator()
         self.window.show_all()
@@ -197,7 +255,6 @@ class App(Gtk.Application):
         return True
 
     def setup_indicator(self):
-        self.indicator = None
         for namespace in ("AppIndicator3", "AyatanaAppIndicator3"):
             try:
                 gi.require_version(namespace, "0.1")
@@ -209,15 +266,34 @@ class App(Gtk.Application):
             except (ValueError, ImportError):
                 continue
         if self.indicator:
-            menu = Gtk.Menu()
-            for label, callback in (("Monitor", lambda _: self.window.present()),
-                                    ("Settings", lambda _: self.show_settings()), ("Quit", lambda _: self.quit())):
-                item = Gtk.MenuItem(label=tr(label))
-                item.connect("activate", callback)
-                menu.append(item)
-            menu.show_all()
-            self.indicator.set_menu(menu)
+            self.menu = Gtk.Menu()
+            self.indicator.set_menu(self.menu)
+            self.build_menu()
             self.update_indicator()
+
+    def build_menu(self):
+        """The tray menu is the only surface a left click can open under GNOME,
+        so each target reports its state there as a text chart."""
+        if not self.menu:
+            return
+        for child in self.menu.get_children():
+            child.destroy()
+        for monitor in self.monitors.values():
+            item = Gtk.MenuItem(label="")
+            item.connect("activate", lambda _: self.overview.toggle())
+            monitor["item"] = item
+            self.render_monitor(monitor)
+            self.menu.append(item)
+        if not self.monitors:
+            self.menu.append(Gtk.MenuItem(label=tr("No targets. Add one in Settings.")))
+        self.menu.append(Gtk.SeparatorMenuItem())
+        for label, callback in (("Chart", lambda _: self.overview.toggle()),
+                                ("Monitor", lambda _: self.window.present()),
+                                ("Settings", lambda _: self.show_settings()), ("Quit", lambda _: self.quit())):
+            item = Gtk.MenuItem(label=tr(label))
+            item.connect("activate", callback)
+            self.menu.append(item)
+        self.menu.show_all()
 
     def reconcile(self):
         previous = self.monitors
@@ -231,6 +307,7 @@ class App(Gtk.Application):
             if not monitor or monitor["target"]["address"] != item["address"]:
                 monitor = dict(samples=[], health="unknown", pending=False)
             monitor["target"] = item
+            monitor["item"] = monitor["summary"] = monitor["mini"] = None
             self.monitors[item["id"]] = monitor
             frame = Gtk.Frame(label=item["name"] or item["address"])
             content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin=8)
@@ -250,6 +327,9 @@ class App(Gtk.Application):
         if not self.monitors:
             self.grid.attach(Gtk.Label(label=tr("No targets. Add one in Settings.")), 0, 0, 2, 1)
         self.grid.show_all()
+        self.build_menu()
+        if self.overview.get_visible():
+            self.overview.rebuild()
 
     def show_settings(self):
         self.window.present()
@@ -279,7 +359,7 @@ class App(Gtk.Application):
             future = self.executor.submit(local_addresses)
             future.add_done_callback(lambda f: deliver(f, self.addresses_done))
         if force or now >= self.next_probe:
-            mode = "foreground" if self.window.get_visible() else "background"
+            mode = "foreground" if self.visible() else "background"
             self.next_probe = now + self.settings[mode + "Interval"]
             for monitor in self.monitors.values():
                 if monitor["pending"]:
@@ -287,10 +367,18 @@ class App(Gtk.Application):
                 monitor["pending"] = True
                 future = self.executor.submit(probe, monitor["target"]["address"], self.settings[mode + "Timeout"])
                 future.add_done_callback(lambda f, m=monitor: deliver(f, self.probe_done, m))
-        if self.window.get_visible():
+        if self.visible():
             for monitor in self.monitors.values():
-                monitor["chart"].queue_draw()
+                self.redraw(monitor)
         return True
+
+    def visible(self):
+        return self.window.get_visible() or self.overview.get_visible()
+
+    def redraw(self, monitor):
+        for key in ("chart", "mini"):
+            if monitor.get(key):
+                monitor[key].queue_draw()
 
     def addresses_done(self, addresses):
         self.address_pending = False
@@ -333,17 +421,28 @@ class App(Gtk.Application):
 
     def render_monitor(self, monitor):
         samples = monitor["samples"]
+        health, item = monitor["health"], monitor["target"]
+        title = item["name"] or item["address"]
         latest = "—" if not samples or samples[-1].latency is None else "%.0f ms" % samples[-1].latency
         values = [s.latency for s in samples[-10:] if s.latency is not None]
         average = "%.0f ms" % (sum(values) / len(values)) if values else "—"
-        monitor["label"].set_markup('<span foreground="%s">● %s</span>  %s: %s · %s: %s' % (
-            COLORS[monitor["health"]], tr(TITLES[monitor["health"]]), tr("Latest"), latest, tr("Average (10)"), average))
-        monitor["label"].set_tooltip_text(error_text(samples[-1].error) if samples and samples[-1].error else None)
-        monitor["chart"].queue_draw()
+        state = '<span foreground="%s">● %s</span>  %s: %s · %s: %s' % (
+            COLORS[health], tr(TITLES[health]), tr("Latest"), latest, tr("Average (10)"), average)
+        error = error_text(samples[-1].error) if samples and samples[-1].error else None
+        for widget, markup in ((monitor["label"], state),
+                               (monitor["summary"], "<b>%s</b>\n%s" % (GLib.markup_escape_text(title), state))):
+            if widget:
+                widget.set_markup(markup)
+                widget.set_tooltip_text(error)
+        if monitor["item"]:
+            monitor["item"].set_label("%s %s  %s  %s · %s %s" % (
+                GLYPHS[health], title, sparkline(samples, self.settings["blueLatencyMs"]),
+                latest, tr("Average"), average))
+        self.redraw(monitor)
 
-    def draw_chart(self, widget, context, monitor):
+    def draw_chart(self, widget, context, monitor, compact=False):
         width, height = widget.get_allocated_width(), widget.get_allocated_height()
-        left, top, right, bottom = 45, 20, width - 8, height - 22
+        left, top, right, bottom = (4, 6, width - 4, height - 4) if compact else (45, 20, width - 8, height - 22)
         context.set_source_rgb(.5, .5, .5)
         context.set_line_width(1)
         context.move_to(left, top)
@@ -358,9 +457,10 @@ class App(Gtk.Application):
             layout.set_text(text, -1)
             context.move_to(x, y)
             PangoCairo.show_layout(context, layout)
-        caption("%.0f ms" % ceiling, 1, top - 14)
-        caption(tr("-%g min") % (self.settings["chartWindowSeconds"] / 60), left, height - 17)
-        caption(time.strftime("%H:%M:%S"), right - 50, height - 17)
+        if not compact:
+            caption("%.0f ms" % ceiling, 1, top - 14)
+            caption(tr("-%g min") % (self.settings["chartWindowSeconds"] / 60), left, height - 17)
+            caption(time.strftime("%H:%M:%S"), right - 50, height - 17)
         cutoff = time.time() - self.settings["chartWindowSeconds"]
         connected = False
         for sample in samples:
@@ -383,7 +483,7 @@ class App(Gtk.Application):
                 connected = True
         context.stroke()
         for sample in samples:
-            if sample.failed or sample.timestamp < cutoff:
+            if compact or sample.failed or sample.timestamp < cutoff:
                 continue
             x = left + (sample.timestamp - cutoff) / self.settings["chartWindowSeconds"] * (right - left)
             y = bottom - sample.latency / ceiling * (bottom - top)
@@ -398,7 +498,6 @@ class App(Gtk.Application):
         state = tuple(m["health"] for m in self.monitors.values()) or ("unknown",)
         if state == self.icon_state:
             return
-        self.icon_state = state
         rows = 2 if len(state) >= 10 else 1
         columns = math.ceil(len(state) / rows)
         pitch = min(7, 22 / columns)
@@ -408,10 +507,15 @@ class App(Gtk.Application):
             x, y = start + index % columns * pitch, 2 + index // columns * 10
             bars.append('<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>' %
                         (x, y, max(.2, pitch - 1), 9 if rows == 2 else 20, COLORS[health]))
-        self.icon_serial = 1 - self.icon_serial
-        path = Path(self.icons.name) / ("status-%s.svg" % self.icon_serial)
-        path.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">' + "".join(bars) + '</svg>')
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">' + "".join(bars) + '</svg>'
+        # GNOME caches icons by path. Never replace an image at a published path;
+        # identical content can safely reuse its cached image on later transitions.
+        digest = hashlib.sha256(svg.encode("utf-8")).hexdigest()
+        path = Path(self.icons.name) / ("status-%s.svg" % digest)
+        if not path.exists():
+            path.write_text(svg, encoding="utf-8")
         self.indicator.set_icon_full(str(path), "PingStats")
+        self.icon_state = state
 
     def do_shutdown(self):
         self.stopping = True
